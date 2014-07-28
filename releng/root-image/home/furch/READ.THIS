@@ -1,0 +1,30 @@
+                                   =========================================================================
+                                         YOU CAN HELP TO MAKE ARCH USER FRIENDLY AND EASY WITH FEEDBACK
+                                   =========================================================================
+
+             Please stop by the Forums:   http://evolution.boardhost.com/index.php  comments and suggestions appreciated and welcome. 
+                                            Report bugs   http://www.jeffstory.org/wordpress/?p=783
+
+                                   To change the default packages Lution downloads and installs in Arch Linux,
+
+
+            1) Edit: /usr/share/cnchi/data/packages.xml to add any packages from the Arch core, extra, and community repos. No AUR packages! 
+               Duplicate the xml format. Do this PRIOR to starting the Lution installer.
+
+
+            2) This is mostly untested and I can see potential problems arising in many situations. Package conflicts are up to you to handle.
+               Example, the propriety video drivers often conflict with open source versions. You would need to remove the open source driver 
+               from the install list to successfully install the propriety version. 
+
+
+            3) Launch Lution using the desktop icon labeled, Lution Installer. 
+
+  
+            If you break the installer, I provided a backup /usr/share/cnchi/data/packages.xml.backup
+             1) delete "packages.xml" 
+             2) rename "packages.xml.backup" to "packages.xml"
+             3) relaunch Lution
+
+                If you want AUR support, I recommend pkgbrowser and pacaur after installing. Give them a spin on the Live CD.
+
+               If you don't care or know what this is all about, just ignore this and install Arch by clicking the Lution icon.

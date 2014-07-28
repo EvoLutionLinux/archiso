@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Install Arch
+Comment=
+Exec=gksu /usr/bin/cnchi -p /usr/share/cnchi/data/packages.xml
+Icon=xfsm-logout
+Path=
+Terminal=false
+StartupNotify=false
+GenericName=Fu-rch Installer

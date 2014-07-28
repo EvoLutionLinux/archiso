@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<channel name="xfce4-desktop" version="1.0">
+  <property name="backdrop" type="empty">
+    <property name="screen0" type="empty">
+      <property name="monitor0" type="empty">
+        <property name="image-path" type="string" value="/home/furch/Evolution.png"/>
+        <property name="last-image" type="string" value="/home/furch/Evolution.png"/>
+        <property name="last-single-image" type="string" value="/home/furch/Evolution.png"/>
+        <property name="image-show" type="bool" value="true"/>
+        <property name="color1" type="array">
+          <value type="uint" value="0"/>
+          <value type="uint" value="0"/>
+          <value type="uint" value="0"/>
+          <value type="uint" value="65535"/>
+        </property>
+        <property name="image-style" type="int" value="1"/>
+      </property>
+    </property>
+    <property name="screen1" type="empty">
+      <property name="monitor0" type="empty">
+        <property name="image-path" type="string" value="/usr/share/backgrounds/xfce/xfce-blue.jpg"/>
+        <property name="last-image" type="string" value="/usr/share/backgrounds/xfce/xfce-blue.jpg"/>
+        <property name="last-single-image" type="string" value="/usr/share/backgrounds/xfce/xfce-blue.jpg"/>
+      </property>
+    </property>
+  </property>
+  <property name="desktop-icons" type="empty">
+    <property name="icon-size" type="uint" value="51"/>
+    <property name="file-icons" type="empty">
+      <property name="show-filesystem" type="bool" value="false"/>
+      <property name="show-removable" type="bool" value="false"/>
+      <property name="show-trash" type="bool" value="false"/>
+      <property name="show-home" type="bool" value="false"/>
+    </property>
+    <property name="use-custom-font-size" type="bool" value="true"/>
+    <property name="font-size" type="double" value="11.000000"/>
+    <property name="show-thumbnails" type="bool" value="true"/>
+  </property>
+</channel>

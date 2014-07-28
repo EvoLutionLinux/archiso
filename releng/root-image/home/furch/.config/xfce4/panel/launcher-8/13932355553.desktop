@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Leafpad
+Comment=Simple text editor
+Exec=leafpad %f
+Icon=leafpad
+Terminal=false
+Type=Application
+MimeType=text/plain
+Categories=GTK;Utility;TextEditor;
+StartupNotify=true
+X-XFCE-Source=file:///usr/share/applications/leafpad.desktop

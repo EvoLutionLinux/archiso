@@ -1,0 +1,24 @@
+[Fu-rch Installer]
+row=4
+col=0
+
+[READ.THIS]
+row=5
+col=0
+
+[PkgBrowser]
+row=6
+col=0
+
+[gparted]
+row=3
+col=0
+
+[Trash]
+row=2
+col=0
+
+[Home]
+row=0
+col=0
+

@@ -1,0 +1,28 @@
+2014-03-24 13:46:36,974 ================================================================================
+2014-03-24 13:46:37,108 Loading calibration curves of current display device profile...
+2014-03-24 13:46:37,137 /usr/bin
+2014-03-24 13:46:37,325 Argyll CMS 1.6.3
+2014-03-24 13:46:37,959 device id 'xrandr-ACR-Acer X223W-LAP080244234' does not exist
+2014-03-24 13:46:38,124 --------------------------------------------------------------------------------
+2014-03-24 13:46:38,125 Command line:
+2014-03-24 13:46:38,125   dispwin
+2014-03-24 13:46:38,128     -v
+2014-03-24 13:46:38,129     -d1
+2014-03-24 13:46:38,129     -c
+2014-03-24 13:46:38,130     -L
+2014-03-24 13:46:38,130 
+2014-03-24 13:46:38,148 About to open dispwin object on the display
+2014-03-24 13:46:38,148 About to clear the calibration
+2014-03-24 13:46:38,149 Dispwin: Error - Failed to get the displays current ICC profile
+2014-03-24 13:46:38,310 device id 'xrandr-SNY-SONY TV' does not exist
+2014-03-24 13:46:38,477 --------------------------------------------------------------------------------
+2014-03-24 13:46:38,478 Command line:
+2014-03-24 13:46:38,479   dispwin
+2014-03-24 13:46:38,479     -v
+2014-03-24 13:46:38,480     -d2
+2014-03-24 13:46:38,480     -c
+2014-03-24 13:46:38,480     -L
+2014-03-24 13:46:38,480 
+2014-03-24 13:46:38,496 About to open dispwin object on the display
+2014-03-24 13:46:38,496 About to clear the calibration
+2014-03-24 13:46:38,496 Dispwin: Error - Failed to get the displays current ICC profile

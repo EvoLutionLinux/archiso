@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Lution Installer
+Comment=
+Icon=xfsm-logout
+Path=
+Terminal=false
+StartupNotify=false
+Name[en_US.UTF-8]=Lution Installer
+Name[en_US.utf8]=Lution Installer
+Exec=su -c "cnchi -p /usr/share/cnchi/data/packages.xml"
+GenericName=Arch Linux GUI Installer

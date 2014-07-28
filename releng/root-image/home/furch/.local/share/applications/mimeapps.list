@@ -1,0 +1,7 @@
+[Default Applications]
+application/x-shellscript=leafpad.desktop
+text/plain=leafpad.desktop
+
+[Added Associations]
+application/x-shellscript=leafpad.desktop;
+text/plain=leafpad.desktop;

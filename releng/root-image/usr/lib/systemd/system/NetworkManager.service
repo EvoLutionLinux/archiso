@@ -1,0 +1,21 @@
+[Unit]
+Description=Network Manager
+Wants=network.target
+Before=network.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.NetworkManager
+ExecStart=/usr/bin/NetworkManager --no-daemon
+# Suppress stderr to eliminate duplicated messages in syslog. NM calls openlog()
+# with LOG_PERROR when run in foreground. But systemd redirects stderr to
+# syslog by default, which results in logging each message twice.
+StandardError=null
+# NM doesn't want systemd to kill its children for it
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+Alias=dbus-org.freedesktop.NetworkManager.service
+Also=NetworkManager-dispatcher.service
+

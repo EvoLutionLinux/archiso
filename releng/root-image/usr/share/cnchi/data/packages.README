@@ -1,0 +1,17 @@
+ 
+the "xorg-drivers" group is added by cnchi in the file: /usr/share/cnchi/src/installation_process.py, lines 489-493, below:
+
+            # Add xorg-drivers group if cnchi can't figure it out
+            # the graphic card driver.
+            if graphics not in ('ati ', 'nvidia', 'intel', 'virtualbox' \
+                                'vmware', 'via '):
+                self.packages.append('xorg-drivers')
+        
+
+
+Other packages may be added by same, above file.
+
+
+
+
+

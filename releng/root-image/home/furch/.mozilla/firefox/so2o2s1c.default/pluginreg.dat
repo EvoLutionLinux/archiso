@@ -1,0 +1,142 @@
+Generated File. Do not edit.
+
+[HEADER]
+Version:0.16:$
+Arch:x86_64-gcc3:$
+
+[PLUGINS]
+libflashplayer.so:$
+/usr/lib/mozilla/plugins/libflashplayer.so:$
+11.2.202.341:$
+1392977479000:0:0:$
+Shockwave Flash 11.2 r202:$
+Shockwave Flash:$
+2
+0:application/x-shockwave-flash:Shockwave Flash:swf:$
+1:application/futuresplash:FutureSplash Player:spl:$
+librhythmbox-itms-detection-plugin.so:$
+/usr/lib/mozilla/plugins/librhythmbox-itms-detection-plugin.so:$
+:$
+1381692932000:0:0:$
+This plug-in detects the presence of iTunes when opening iTunes Store URLs in a web page with Firefox.:$
+iTunes Application Detector:$
+1
+0:application/itunes-plugin:::$
+gecko-mediaplayer.so:$
+/usr/lib/mozilla/plugins/gecko-mediaplayer.so:$
+:$
+1370198073000:0:0:$
+<a href="http://kdekorte.googlepages.com/gecko-mediaplayer">Gecko Media Player</a> 1.0.8<br><br>Video Player Plug-in for QuickTime, RealPlayer and Windows Media Player streams using <a href="http://mplayerhq.hu">MPlayer</a>:$
+mplayerplug-in is now gecko-mediaplayer 1.0.8:$
+46
+0:audio/x-mpegurl:MPEG Playlist:m3u:$
+1:video/mpeg:MPEG:mpg,mpeg:$
+2:audio/mpeg:MPEG:mpg,mpeg:$
+3:video/x-mpeg:MPEG:mpg,mpeg:$
+4:video/x-mpeg2:MPEG2:mpv2,mp2ve:$
+5:audio/mpeg:MPEG:mpg,mpeg:$
+6:audio/x-mpeg:MPEG:mpg,mpeg:$
+7:audio/mpeg2:MPEG audio:mp2:$
+8:audio/x-mpeg2:MPEG audio:mp2:$
+9:audio/mp4:MPEG 4 audio:mp4:$
+10:audio/x-mp4:MPEG 4 audio:mp4:$
+11:video/mp4:MPEG 4 Video:mp4:$
+12:video/x-m4v:MPEG 4 Video:m4v:$
+13:video/3gpp:MPEG 4 Video:mp4,3gp:$
+14:audio/mpeg3:MPEG audio:mp3:$
+15:audio/x-mpeg3:MPEG audio:mp3:$
+16:audio/x-mpegurl:MPEG url:m3u:$
+17:audio/mp3:MPEG audio:mp3:$
+18:application/x-ogg:Ogg Vorbis Media:ogg,oga,ogm:$
+19:application/ogg:Ogg Vorbis Media:ogg,oga,ogm:$
+20:audio/x-ogg:Ogg Vorbis Audio:ogg,oga:$
+21:audio/ogg:Ogg Vorbis Audio:ogg,oga:$
+22:video/x-ogg:Ogg Vorbis Video:ogg,ogm:$
+23:video/ogg:Ogg Vorbis Video:ogg,ogm:$
+24:application/x-vlc-plugin:VLC plug-in:vlc:$
+25:application/x-google-vlc-plugin:Google VLC plug-in::$
+26:audio/flac:FLAC Audio:flac:$
+27:audio/x-flac:FLAC Audio:flac:$
+28:video/fli:FLI animation:fli,flc:$
+29:video/x-fli:FLI animation:fli,flc:$
+30:video/x-flv:Flash Video:flv:$
+31:video/flv:Flash Video:flv:$
+32:video/vnd.vivo:VivoActive:viv,vivo:$
+33:audio/x-matroska:Matroska Audio:mka:$
+34:video/x-matroska:Matroska Video:mkv:$
+35:application/x-nsv-vp3-mp3:Nullsoft Streaming Video:nsv:$
+36:audio/x-mod:Soundtracker:mod:$
+37:audio/x-aiff:AIFF Audio:aif:$
+38:audio/basic:Basic Audio File:au,snd:$
+39:audio/x-basic:Basic Audio File:au,snd:$
+40:audio/x-scpls:Shoutcast Playlist:pls:$
+41:video/x-mng:Multiple-Image Network Graphics:mng:$
+42:audio/webm:WEBM audio File:webm:$
+43:audio/x-webm:WEBM audio File:webm:$
+44:video/webm:WEBM video File:webm:$
+45:video/x-webm:WEBM video File:webm:$
+gecko-mediaplayer-rm.so:$
+/usr/lib/mozilla/plugins/gecko-mediaplayer-rm.so:$
+:$
+1370198073000:0:0:$
+<a href="http://kdekorte.googlepages.com/gecko-mediaplayer">Gecko Media Player</a> 1.0.8<br><br>Video Player Plug-in for QuickTime, RealPlayer and Windows Media Player streams using <a href="http://mplayerhq.hu">MPlayer</a>:$
+RealPlayer 9:$
+7
+0:audio/x-pn-realaudio:RealAudio:ram,rm:$
+1:application/vnd.rn-realmedia:RealMedia:rm:$
+2:application/vnd.rn-realaudio:RealAudio:ra,ram:$
+3:video/vnd.rn-realvideo:RealVideo:rv:$
+4:audio/x-realaudio:RealAudio:ra:$
+5:audio/x-pn-realaudio-plugin:RealAudio:rpm:$
+6:application/smil:SMIL:smil:$
+gecko-mediaplayer-qt.so:$
+/usr/lib/mozilla/plugins/gecko-mediaplayer-qt.so:$
+:$
+1370198073000:0:0:$
+<a href="http://kdekorte.googlepages.com/gecko-mediaplayer">Gecko Media Player</a> 1.0.8<br><br>Video Player Plug-in for QuickTime, RealPlayer and Windows Media Player streams using <a href="http://mplayerhq.hu">MPlayer</a>:$
+QuickTime Plug-in 7.6.9:$
+6
+0:video/quicktime:Quicktime:mov:$
+1:video/x-quicktime:Quicktime:mov:$
+2:image/x-quicktime:Quicktime:mov:$
+3:video/quicktime:Quicktime:mp4:$
+4:video/quicktime:Quicktime - Session Description Protocol:sdp:$
+5:application/x-quicktimeplayer:Quicktime:mov:$
+gecko-mediaplayer-wmp.so:$
+/usr/lib/mozilla/plugins/gecko-mediaplayer-wmp.so:$
+:$
+1370198073000:0:0:$
+<a href="http://kdekorte.googlepages.com/gecko-mediaplayer">Gecko Media Player</a> 1.0.8<br><br>Video Player Plug-in for QuickTime, RealPlayer and Windows Media Player streams using <a href="http://mplayerhq.hu">MPlayer</a>:$
+Windows Media Player Plug-in:$
+20
+0:application/asx:Media Files:*:$
+1:video/x-ms-asf-plugin:Media Files:*:$
+2:video/x-msvideo:AVI:avi,*:$
+3:video/msvideo:AVI:avi,*:$
+4:application/x-mplayer2:Media Files:*:$
+5:video/x-mplayer2:Media Files:*:$
+6:application/x-ms-wmv:Microsoft WMV video:wmv,*:$
+7:video/x-ms-asf:Media Files:asf,asx,*:$
+8:video/x-ms-asx:Media Files:asx,*:$
+9:video/x-ms-wm:Media Files:wm,*:$
+10:video/x-ms-wmv:Microsoft WMV video:wmv,*:$
+11:audio/x-ms-wmv:Windows Media:wmv,*:$
+12:video/x-ms-wmp:Windows Media:wmp,*:$
+13:application/x-ms-wmp:Windows Media:wmp,*:$
+14:video/x-ms-wvx:Windows Media:wvx,*:$
+15:audio/x-ms-wax:Windows Media:wax,*:$
+16:audio/x-ms-wma:Windows Media:wma,*:$
+17:application/x-drm-v2:Windows Media:asx,*:$
+18:audio/wav:Microsoft wave file:wav,*:$
+19:audio/x-wav:Microsoft wave file:wav,*:$
+gecko-mediaplayer-dvx.so:$
+/usr/lib/mozilla/plugins/gecko-mediaplayer-dvx.so:$
+:$
+1370198073000:0:0:$
+<a href="http://kdekorte.googlepages.com/gecko-mediaplayer">Gecko Media Player</a> 1.0.8<br><br>Video Player Plug-in for QuickTime, RealPlayer and Windows Media Player streams using <a href="http://mplayerhq.hu">MPlayer</a>:$
+DivX Browser Plug-In:$
+2
+0:video/divx:DivX Media Format:divx:$
+1:video/vnd.divx:DivX Media Format:divx:$
+
+[INVALID]
