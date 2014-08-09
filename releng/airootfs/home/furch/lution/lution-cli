@@ -147,7 +147,7 @@ create_partition_scheme(){
   print_title "https://wiki.archlinux.org/index.php/Partitioning"
   print_info "Partitioning logically divides a hard drive into seperate sections (e.g. boot, root (system), home (personal files), and swap)."
   print_info "Although partitioning is generally up to the user, UEFI systems MUST have a separate boot partition using filesystem FAT32."
-  partition_layout=("Standard" "Plus Encryption" "Plus LVM" "Plus Encryption and LVM")
+  partition_layout=("Standard" "Plus LVM" "Plus Encryption and LVM")
   PS3="$prompt1"
   echo -e "Select partition scheme:"
   select OPT in "${partition_layout[@]}"; do
@@ -157,13 +157,9 @@ create_partition_scheme(){
         ;;
       2)
         create_partition
-        setup_luks
-        ;;
-      3)
-        create_partition
         setup_lvm
         ;;
-      4)
+      3)
         create_partition
         setup_luks
         setup_lvm
