@@ -1,0 +1,4 @@
+xset -dpms; xset s off &
+xsetroot -solid "#000000" &
+tint2 &
+(sleep 1s && conky ~/.conkyrc) &

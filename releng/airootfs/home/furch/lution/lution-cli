@@ -1,0 +1,1224 @@
+# !/bin/bash
+#
+# Lution-AIS installer (version 0.1 - August 2014)
+#
+# Based on the Arch Installation Script (AIS) and Arch Ultimate Installation 
+# script (AUI) written by helmuthdu (helmuthdu[at]gmail[dot]com). Modified by
+# Carl Duff for Evo/Lution Linux.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-----------------------------------------------------------------------
+
+
+# Ensure that the 'sharedfuncs_evo' script is present and source it
+if [[ -f `pwd`/sharedfuncs_evo ]]; then
+  source sharedfuncs_evo
+else
+  echo "This script requires the sharedfuncs_evo file to be present in the same directory. Closing."
+  pause_function
+  exit 1
+fi
+
+#CHECK EVO REQUIREMENTS
+check_evo_requirements() {
+# Written by Carl Duff. Incorporates simplified networking check (the original
+# check_connection function is no longer used).
+
+# Check 1: Ensure that the script is being run with root privilages
+
+if  [[ `whoami` != "root" ]]; 
+then
+  print_danger "This script must be run with root privilages (i.e. the 'sudo' command)."
+  pause_function
+  exit 1
+fi
+
+# Check 2: Ensure that there is an active internet connection
+
+if ! [ "`ping -c 1 google.com`" ]; 
+then
+  echo 
+  print_danger "Connection test failed. You must run this script with an active internet connection."
+  pause_function
+  exit 1
+fi
+}
+
+
+# SELECT KEYMAP - SETXKBMAP
+# Modified by Carl Duff to use the 'setxkbmap' command rather than 'loadkeys' for the installer terminal.
+select_keymap_xkb(){
+  print_title "KEYMAP - https://wiki.archlinux.org/index.php/KEYMAP"
+  print_info "The setxkbmap command defines the keyboard keymap to be used in the terminal."
+  pause_function
+  OPTION=n
+  while [[ $OPTION != y ]]; do
+    getkeymap_xkb
+    read_input_text "Confirm keymap: $KEYMAP_XKB"
+  done
+  setxkbmap ${KEYMAP_XKB:0:2}
+}
+
+#}}}
+#MIRRORLIST {{{
+configure_mirrorlist(){
+  local countries_code=("AU" "AT" "BY" "BE" "BR" "BG" "CA" "CL" "CN" "CO" "CZ" "DK" "EE" "FI" "FR" "DE" "GR" "HU" "IN" "IE" "IL" "IT" "JP" "KZ" "KR" "LV" "LU" "MK" "NL" "NC" "NZ" "NO" "PL" "PT" "RO" "RU" "RS" "SG" "SK" "ZA" "ES" "LK" "SE" "CH" "TW" "TR" "UA" "GB" "US" "UZ" "VN")
+  local countries_name=("Australia" "Austria" "Belarus" "Belgium" "Brazil" "Bulgaria" "Canada" "Chile" "China" "Colombia" "Czech Republic" "Denmark" "Estonia" "Finland" "France" "Germany" "Greece" "Hungary" "India" "Ireland" "Israel" "Italy" "Japan" "Kazakhstan" "Korea" "Latvia" "Luxembourg" "Macedonia" "Netherlands" "New Caledonia" "New Zealand" "Norway" "Poland" "Portugal" "Romania" "Russian" "Serbia" "Singapore" "Slovakia" "South Africa" "Spain" "Sri Lanka" "Sweden" "Switzerland" "Taiwan" "Turkey" "Ukraine" "United Kingdom" "United States" "Uzbekistan" "Viet Nam")
+  country_list(){
+    #`reflector --list-countries | sed 's/[0-9]//g' | sed 's/^/"/g' | sed 's/,.*//g' | sed 's/ *$//g'  | sed 's/$/"/g' | sed -e :a -e '$!N; s/\n/ /; ta'`
+    PS3="$prompt1"
+    echo "Select your country:"
+    select country_name in "${countries_name[@]}"; do
+      if contains_element "$country_name" "${countries_name[@]}"; then
+        contry_code=${countries_code[$(( $REPLY - 1 ))]}
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+  print_title "MIRRORLIST - https://wiki.archlinux.org/index.php/Mirrors"
+  print_info "This option is a guide to selecting and configuring your mirrors, and a listing of current available mirrors."
+  OPTION=n
+  while [[ $OPTION != y ]]; do
+    country_list
+    read_input_text "Confirm country: $country_name"
+  done
+
+  url="https://www.archlinux.org/mirrorlist/?country=${contry_code}&use_mirror_status=on"
+
+  tmpfile=$(mktemp --suffix=-mirrorlist)
+
+  # Get latest mirror list and save to tmpfile
+  curl -so ${tmpfile} ${url}
+  sed -i 's/^#Server/Server/g' ${tmpfile}
+
+  # Backup and replace current mirrorlist file (if new file is non-zero)
+  if [[ -s ${tmpfile} ]]; then
+   { echo " Backing up the original mirrorlist..."
+     mv -i /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.orig; } &&
+   { echo " Rotating the new list into place..."
+     mv -i ${tmpfile} /etc/pacman.d/mirrorlist; }
+  else
+    echo " Unable to update, could not download list."
+  fi
+  # allow global read access (required for non-root yaourt execution)
+  chmod +r /etc/pacman.d/mirrorlist
+  leafpad /etc/pacman.d/mirrorlist
+}
+#}}}
+#UMOUNT PARTITIONS {{{
+umount_partitions(){
+  mounted_partitions=(`lsblk | grep ${MOUNTPOINT} | awk '{print $7}' | sort -r`)
+  swapoff -a
+  for i in ${mounted_partitions[@]}; do
+    umount $i
+  done
+}
+#}}}
+#CREATE PARTITION SCHEME {{{
+create_partition_scheme(){
+  LUKS=0
+  LVM=0
+  select_device(){
+    devices_list=(`lsblk -d | awk '{print "/dev/" $1}' | grep 'sd\|hd\|vd'`);
+    PS3="$prompt1"
+    echo -e "Select partition:\n"
+    select device in "${devices_list[@]}"; do
+      if contains_element "${device}" "${devices_list[@]}"; then
+        break
+      else
+        invalid_option
+      fi
+    done
+    BOOT_DISK=$device
+  }
+  print_title "https://wiki.archlinux.org/index.php/Partitioning"
+  print_info "Partitioning logically divides a hard drive into seperate sections (e.g. boot, root (system), home (personal files), and swap)."
+  print_info "Although partitioning is generally up to the user, UEFI systems MUST have a separate boot partition using filesystem FAT32."
+  partition_layout=("Standard" "Plus Encryption" "Plus LVM" "Plus Encryption and LVM")
+  PS3="$prompt1"
+  echo -e "Select partition scheme:"
+  select OPT in "${partition_layout[@]}"; do
+    case "$REPLY" in
+      1)
+        create_partition
+        ;;
+      2)
+        create_partition
+        setup_luks
+        ;;
+      3)
+        create_partition
+        setup_lvm
+        ;;
+      4)
+        create_partition
+        setup_luks
+        setup_lvm
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+#SETUP PARTITION{{{
+# Modified by Carl Duff. Integrated Gparted, and dropped most of the other partitioning tools.
+create_partition(){
+  print_title "CHOOSE PARTITIONING TOOL"
+  print_warning "It is not necessary to actually format the partitions created, as this will be undertaken later."
+  echo
+  print_info "GParted is a user-friendly graphical tool that supports both BIOS and UEFI systems."
+  print_info "Text-based tools available are cfdisk for BIOS systems (MBR), or gdisk for UEFI systems (GPT)."
+  apps_list=("gparted" "cfdisk" "gdisk");
+  PS3="$prompt1"
+  echo -e "Select partition program:"
+  select OPT in "${apps_list[@]}"; do
+    if contains_element "$OPT" "${apps_list[@]}"; then
+      select_device
+      $OPT ${device}
+      break
+    else
+      invalid_option
+    fi
+  done
+}
+#}}}
+#SETUP LUKS {{{
+setup_luks(){
+  print_title "LUKS - https://wiki.archlinux.org/index.php/LUKS"
+  print_info "The Linux Unified Key Setup or LUKS is a disk-encryption specification created by Clemens Fruhwirth and originally intended for Linux."
+  print_danger "\tDo not use this for boot partitions"
+  block_list=(`lsblk | grep 'part' | awk '{print "/dev/" substr($1,3)}'`)
+  PS3="$prompt1"
+  echo -e "Select partition:"
+  select OPT in "${block_list[@]}"; do
+    if contains_element "$OPT" "${block_list[@]}"; then
+      cryptsetup luksFormat $OPT
+      cryptsetup open --type luks $OPT crypt
+      LUKS=1
+      LUKS_DISK=`echo ${OPT} | sed 's/\/dev\///'`
+      break
+    elif [[ $OPT == "Cancel" ]]; then
+      break
+    else
+      invalid_option
+    fi
+  done
+}
+#}}}
+#SETUP LVM {{{
+setup_lvm(){
+  print_title "LVM - https://wiki.archlinux.org/index.php/LVM"
+  print_info "LVM is a logical volume manager for the Linux kernel; it manages disk drives and similar mass-storage devices. "
+  print_warning "Last partition will take 100% of free space left"
+  if [[ $LUKS -eq 1 ]]; then
+    pvcreate /dev/mapper/crypt
+    vgcreate lvm /dev/mapper/crypt
+  else
+    block_list=(`lsblk | grep 'part' | awk '{print "/dev/" substr($1,3)}'`)
+    PS3="$prompt1"
+    echo -e "Select partition:"
+    select OPT in "${block_list[@]}"; do
+      if contains_element "$OPT" "${block_list[@]}"; then
+        pvcreate $OPT
+        vgcreate lvm $OPT
+        break
+      else
+        invalid_option
+      fi
+    done
+  fi
+  read -p "Enter number of partitions [ex: 2]: " number_partitions
+  i=1
+  while [[ $i -le $number_partitions ]]; do
+    read -p "Enter $iª partition name [ex: home]: " partition_name
+    if [[ $i -eq $number_partitions ]]; then
+      lvcreate -l 100%FREE lvm -n ${partition_name}
+    else
+      read -p "Enter $iª partition size [ex: 25G, 200M]: " partition_size
+      lvcreate -L ${partition_size} lvm -n ${partition_name}
+    fi
+    i=$(( i + 1 ))
+  done
+  LVM=1
+}
+#}}}
+#SELECT|FORMAT PARTITIONS {{{
+format_partitions(){
+  print_title "https://wiki.archlinux.org/index.php/File_Systems"
+  print_info "This step will select and format the selected partiton where the archlinux will be installed"
+  print_danger "\tAll data on the ROOT and SWAP partition will be LOST."
+  i=0
+
+  block_list=(`lsblk | grep 'part\|lvm' | awk '{print substr($1,3)}'`)
+
+  # check if there is no partition
+  if [[ ${#block_list[@]} -eq 0 ]]; then
+    print_danger "No partition found! Please re-check your partitions."
+    pause_function
+    create_partition
+  fi
+
+  partitions_list=()
+  for OPT in ${block_list[@]}; do
+    check_lvm=`echo $OPT | grep lvm`
+    if [[ -z $check_lvm ]]; then
+      partitions_list+=("/dev/$OPT")
+    else
+      partitions_list+=("/dev/mapper/$OPT")
+    fi
+  done
+
+  # partitions based on boot system
+  if [[ $UEFI -eq 1 ]]; then
+    partition_name=("root" "EFI" "swap" "another")
+  else
+    partition_name=("root" "swap" "another")
+  fi
+
+  select_filesystem(){
+    filesystems_list=( "btrfs" "ext2" "ext3" "ext4" "f2fs" "jfs" "nilfs2" "ntfs" "vfat" "xfs");
+    PS3="$prompt1"
+    echo -e "Select filesystem:\n"
+    select filesystem in "${filesystems_list[@]}"; do
+      if contains_element "${filesystem}" "${filesystems_list[@]}"; then
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+
+  disable_partition(){
+    #remove the selected partition from list
+    unset partitions_list[${partition_number}]
+    partitions_list=(${partitions_list[@]})
+    #increase i
+    [[ ${partition_name[i]} != another ]] && i=$(( i + 1 ))
+  }
+
+  format_partition(){
+    read_input_text "Confirm format $1 partition"
+    if [[ $OPTION == y ]]; then
+      [[ -z $3 ]] && select_filesystem || filesystem=$3
+      mkfs.${filesystem} $1 \
+        $([[ ${filesystem} == xfs || ${filesystem} == btrfs ]] && echo "-f") \
+        $([[ ${filesystem} == vfat ]] && echo "-F32")
+      fsck $1
+      mkdir -p $2
+      mount -t ${filesystem} $1 $2
+      disable_partition
+    fi
+  }
+
+  format_swap_partition(){
+    read_input_text "Confirm format $1 partition"
+    if [[ $OPTION == y ]]; then
+      mkswap $1
+      swapon $1
+      disable_partition
+    fi
+  }
+
+  create_swap(){
+    swap_options=("partition" "file" "skip");
+    PS3="$prompt1"
+    echo -e "Select ${BYellow}${partition_name[i]}${Reset} filesystem:\n"
+    select OPT in "${swap_options[@]}"; do
+      case "$REPLY" in
+        1)
+          select partition in "${partitions_list[@]}"; do
+            #get the selected number - 1
+            partition_number=$(( $REPLY - 1 ))
+            if contains_element "${partition}" "${partitions_list[@]}"; then
+              format_swap_partition "${partition}"
+            fi
+            break
+          done
+          break
+          ;;
+        2)
+          total_memory=`grep MemTotal /proc/meminfo | awk '{print $2/1024}' | sed 's/\..*//'`
+          fallocate -l ${total_memory}M ${MOUNTPOINT}/swapfile
+          chmod 600 ${MOUNTPOINT}/swapfile
+          mkswap ${MOUNTPOINT}/swapfile
+          swapon ${MOUNTPOINT}/swapfile
+          i=$(( i + 1 ))
+          break
+          ;;
+        3)
+          i=$(( i + 1 ))
+          break
+          ;;
+        *)
+          invalid_option
+          ;;
+      esac
+    done
+  }
+
+  check_mountpoint(){
+    if mount | grep $2; then
+      echo "Successfully mounted"
+      disable_partition "$1"
+    else
+      echo "WARNING: Not Successfully mounted"
+    fi
+  }
+
+  set_efi_partition(){
+    efi_options=("/boot/efi" "/boot")
+    PS3="$prompt1"
+    echo -e "Select EFI mountpoint:\n"
+    select EFI_DISK in "${efi_options[@]}"; do
+      if contains_element "${EFI_DISK}" "${efi_options[@]}"; then
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+
+  while true; do
+    PS3="$prompt1"
+    if [[ ${partition_name[i]} == swap ]]; then
+      create_swap
+    else
+      echo -e "Select ${BYellow}${partition_name[i]}${Reset} partition:\n"
+      select partition in "${partitions_list[@]}"; do
+        #get the selected number - 1
+        partition_number=$(( $REPLY - 1 ))
+        if contains_element "${partition}" "${partitions_list[@]}"; then
+          case ${partition_name[i]} in
+            root)
+              ROOT_PART=`echo ${partition} | sed 's/\/dev\/mapper\///' | sed 's/\/dev\///'`
+              ROOT_DISK=${partition}
+              format_partition "${partition}" "${MOUNTPOINT}"
+              ;;
+            EFI)
+              set_efi_partition
+              read_input_text "Format ${partition} partition"
+              if [[ $OPTION == y ]]; then
+                format_partition "${partition}" "${MOUNTPOINT}${EFI_DISK}" vfat
+              else
+                mkdir -p "${MOUNTPOINT}${EFI_DISK}"
+                mount -t vfat "${partition}" "${MOUNTPOINT}${EFI_DISK}"
+                check_mountpoint "${partition}" "${MOUNTPOINT}${EFI_DISK}"
+              fi
+              ;;
+            another)
+              read -p "Mountpoint [ex: /home]:" directory
+              [[ $directory == "/boot" ]] && BOOT_DISK=`echo ${partition} | sed 's/[0-9]//'`
+              select_filesystem
+              read_input_text "Format ${partition} partition"
+              if [[ $OPTION == y ]]; then
+                format_partition "${partition}" "${MOUNTPOINT}${directory}" "${filesystem}"
+              else
+                read_input_text "Confirm fs="${filesystem}" part="${partition}" dir="${directory}""
+                if [[ $OPTION == y ]]; then
+                  mkdir -p ${MOUNTPOINT}${directory}
+                  mount -t ${filesystem} ${partition} ${MOUNTPOINT}${directory}
+                  check_mountpoint "${partition}" "${MOUNTPOINT}${directory}"
+                fi
+              fi
+              ;;
+          esac
+          break
+        else
+          invalid_option
+        fi
+      done
+    fi
+    #check if there is no partitions left
+    if [[ ${#partitions_list[@]} -eq 0 && ${partition_name[i]} != swap ]]; then
+      break
+    elif [[ ${partition_name[i]} == another ]]; then
+      read_input_text "Configure more partitions"
+      [[ $OPTION != y ]] && break
+    fi
+  done
+  pause_function
+}
+
+#INSTALL BASE SYSTEM
+# Modified / simplified by Carl Duff. Removed dhcpcd configuration aspect as a new networking option has been added.
+install_base_system(){
+  print_title "INSTALL BASE SYSTEM"
+  print_info "The pacstrap script will be used to install the base system and the base-devel package group."
+  pacstrap ${MOUNTPOINT} base base-devel btrfs-progs ntp sudo
+  local WIRELESS_DEV=`ip link | grep wlp | awk '{print $2}'| sed 's/://' | sed '1!d'`
+  if [[ -n $WIRELESS_DEV ]]; then
+    pacstrap ${MOUNTPOINT} iw wireless_tools wpa_actiond wpa_supplicant dialog
+  fi
+}
+#}}}
+
+#}}}
+#CONFIGURE FSTAB {{{
+configure_fstab(){
+  print_title "FSTAB - https://wiki.archlinux.org/index.php/Fstab"
+  print_info "The /etc/fstab file contains static filesystem information. It defines how storage devices and partitions are to be mounted and integrated into the overall system. It is read by the mount command to determine which options to use when mounting a specific partition or partition."
+  if [[ ! -f ${MOUNTPOINT}/etc/fstab.aui ]]; then
+    cp ${MOUNTPOINT}/etc/fstab ${MOUNTPOINT}/etc/fstab.aui
+  else
+    cp ${MOUNTPOINT}/etc/fstab.aui ${MOUNTPOINT}/etc/fstab
+  fi
+  if [[ $UEFI -eq 1 ]]; then
+    fstab_list=("DEV" "PARTUUID" "LABEL");
+  else
+    fstab_list=("DEV" "UUID" "LABEL");
+  fi
+
+  PS3="$prompt1"
+  echo -e "Configure fstab based on:"
+  select OPT in "${fstab_list[@]}"; do
+    case "$REPLY" in
+      1) genfstab -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab ;;
+      2) if [[ $UEFI -eq 1 ]]; then
+          genfstab -t PARTUUID -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
+         else
+          genfstab -U -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
+         fi
+         ;;
+      3) genfstab -L -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab ;;
+      *) invalid_option ;;
+    esac
+    [[ -n $OPT ]] && break
+  done
+  echo "Review your fstab"
+  [[ -f ${MOUNTPOINT}/swapfile ]] && sed -i "s/\\${MOUNTPOINT}//" ${MOUNTPOINT}/etc/fstab
+  pause_function
+  leafpad ${MOUNTPOINT}/etc/fstab
+}
+#}}}
+#CONFIGURE HOSTNAME {{{
+configure_hostname(){
+  print_title "HOSTNAME - https://wiki.archlinux.org/index.php/HOSTNAME"
+  print_info "A host name is a unique name created to identify a machine on a network.Host names are restricted to alphanumeric characters.\nThe hyphen (-) can be used, but a host name cannot start or end with it. Length is restricted to 63 characters."
+  read -p "Hostname [ex: archlinux]: " host_name
+  echo "$host_name" > ${MOUNTPOINT}/etc/hostname
+  if [[ ! -f ${MOUNTPOINT}/etc/hosts.aui ]]; then
+    cp ${MOUNTPOINT}/etc/hosts ${MOUNTPOINT}/etc/hosts.aui
+  else
+    cp ${MOUNTPOINT}/etc/hosts.aui ${MOUNTPOINT}/etc/hosts
+  fi
+  arch_chroot "sed -i '/127.0.0.1/s/$/ '${host_name}'/' /etc/hosts"
+  arch_chroot "sed -i '/::1/s/$/ '${host_name}'/' /etc/hosts"
+}
+#}}}
+#CONFIGURE TIMEZONE {{{
+configure_timezone(){
+  print_title "TIMEZONE - https://wiki.archlinux.org/index.php/Timezone"
+  print_info "In an operating system the time (clock) is determined by four parts: Time value, Time standard, Time Zone, and DST (Daylight Saving Time if applicable)."
+  OPTION=n
+  while [[ $OPTION != y ]]; do
+    settimezone
+    read_input_text "Confirm timezone (${ZONE}/${SUBZONE})"
+  done
+  arch_chroot "ln -s /usr/share/zoneinfo/${ZONE}/${SUBZONE} /etc/localtime"
+}
+#}}}
+#CONFIGURE HARDWARECLOCK {{{
+configure_hardwareclock(){
+  print_title "HARDWARE CLOCK TIME - https://wiki.archlinux.org/index.php/Internationalization"
+  print_info "This is set in /etc/adjtime. Set the hardware clock mode uniformly between your operating systems on the same machine. Otherwise, they will overwrite the time and cause clock shifts (which can cause time drift correction to be miscalibrated)."
+  hwclock_list=('UTC' 'Localtime');
+  PS3="$prompt1"
+  select OPT in "${hwclock_list[@]}"; do
+    case "$REPLY" in
+      1) arch_chroot "hwclock --systohc --utc";
+        ;;
+      2) arch_chroot "hwclock --systohc --localtime";
+        ;;
+      *) invalid_option ;;
+    esac
+    [[ -n $OPT ]] && break
+  done
+}
+#}}}
+
+# CONFIGURE KEYMAP - INSTALLED SYSTEM
+# Modified by Carl DUff from the select_keymap function to configure the installed system.
+configure_keymap(){
+  print_title "KEYMAP - https://wiki.archlinux.org/index.php/KEYMAP"
+  print_info "The /etc/rc.conf file determines the keyboard layout in the installed system's virtual console."
+  pause_function
+  OPTION=n
+  while [[ $OPTION != y ]]; do
+    getkeymap
+    read_input_text "Confirm keymap: $KEYMAP"
+  done
+  echo "KEYMAP=$KEYMAP" > ${MOUNTPOINT}/etc/vconsole.conf
+}
+
+#CONFIGURE LOCALE - INSTALLED SYSTEM
+configure_locale(){
+  print_title "LOCALE - https://wiki.archlinux.org/index.php/Locale"
+  print_info "Locales define the language the user uses. They are codes starting with two lower-case letters followed by two upper-case letters."
+  print_info "The lower-case letters determine the language, and the upper-case letters determine the country. For example 'en_GB' means english, GREAT BRITAIN."
+  pause_function
+  OPTION=n
+  while [[ $OPTION != y ]]; do
+    setlocale
+    read_input_text "Confirm locale ($LOCALE)"
+  done
+  echo 'LANG="'$LOCALE_UTF8'"' > ${MOUNTPOINT}/etc/locale.conf
+  arch_chroot "sed -i '/'${LOCALE_UTF8}'/s/^#//' /etc/locale.gen"
+  arch_chroot "locale-gen"
+}
+
+#CONFIGURE MKINITCPIO - INSTALLED SYSTEM
+configure_mkinitcpio(){
+  print_title "MKINITCPIO - https://wiki.archlinux.org/index.php/Mkinitcpio"
+  print_info "mkinitcpio is a Bash script used to create an initial ramdisk environment."
+  [[ $LUKS -eq 1 ]] && sed -i '/^HOOK/s/block/block keymap encrypt/' ${MOUNTPOINT}/etc/mkinitcpio.conf
+  [[ $LVM -eq 1 ]] && sed -i '/^HOOK/s/filesystems/lvm2 filesystems/' ${MOUNTPOINT}/etc/mkinitcpio.conf
+  arch_chroot "mkinitcpio -p linux"
+}
+
+#INSTALL BOOTLOADER
+install_bootloader(){
+  print_title "BOOTLOADER - https://wiki.archlinux.org/index.php/Bootloader"
+  print_info "The boot loader is responsible for loading the kernel and initial RAM disk before initiating the boot process."
+  print_warning "\tROOT Partition: ${ROOT_DISK}"
+  print_warning "\tWARNING: There is no support for GRUB + LUKS/LVM."
+  if [[ $UEFI -eq 1 ]]; then
+    print_warning "\tUEFI Mode Detected"
+    bootloaders_list=("Grub2" "Syslinux" "Gummiboot" "Skip")
+  else
+    print_warning "\tBIOS Mode Detected"
+    bootloaders_list=("Grub2" "Syslinux" "Skip")
+  fi
+  PS3="$prompt1"
+  echo -e "Install bootloader:\n"
+  select bootloader in "${bootloaders_list[@]}"; do
+    case "$REPLY" in
+      1)
+        pacstrap ${MOUNTPOINT} grub os-prober
+        break
+        ;;
+      2)
+        pacstrap ${MOUNTPOINT} syslinux
+        break
+        ;;
+      3)
+        [[ $UEFI -eq 1 ]] && pacstrap ${MOUNTPOINT} gummiboot
+        break
+        ;;
+      4)
+        [[ $UEFI -eq 1 ]] && break || invalid_option
+        ;;
+      *)
+        invalid_option
+        ;;
+    esac
+  done
+  [[ $UEFI -eq 1 ]] && pacstrap ${MOUNTPOINT} efibootmgr dosfstools
+}
+
+#CONFIGURE BOOTLOADER - INSTALLED SYSTEM
+# Modified by Carl Duff. Removed the "manual" options and the '--debug' flag for non-UEFI grub installations.
+configure_bootloader(){
+  case $bootloader in
+    Grub2)
+      print_title "GRUB2 - https://wiki.archlinux.org/index.php/GRUB2"
+      print_info "GRUB2 is the next generation of the GRand Unified Bootloader (GRUB).\nIn brief, the bootloader is the first software program that runs when a computer starts. It is responsible for loading and transferring control to the Linux kernel."
+ 
+      if [[ $UEFI -eq 1 ]]; then
+         arch_chroot "grub-install --target=x86_64-efi --efi-directory=${EFI_DISK} --bootloader-id=arch_grub --recheck"
+      else
+         arch_chroot "grub-install --target=i386-pc --recheck ${BOOT_DISK}"
+         fi
+     
+      arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
+      ;;
+      
+    Syslinux)
+      print_title "SYSLINUX - https://wiki.archlinux.org/index.php/Syslinux"
+      print_info "Syslinux is a collection of boot loaders capable of booting from hard drives, CDs, and over the network via PXE. It supports the fat, ext2, ext3, ext4, and btrfs file systems."
+      syslinux_install_mode=("[MBR] Automatic" "[PARTITION] Automatic")
+      PS3="$prompt1"
+      echo -e "Syslinux Install:\n"
+      select OPT in "${syslinux_install_mode[@]}"; do
+        case "$REPLY" in
+          1)
+            arch_chroot "syslinux-install_update -iam"
+            if [[ $LUKS -eq 1 ]]; then
+              sed -i "s/APPEND root=.*/APPEND root=\/dev\/mapper\/${ROOT_PART} cryptdevice=\/dev\/${LUKS_DISK}:crypt ro/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            elif [[ $LVM -eq 1 ]]; then
+              sed -i "s/sda[0-9]/\/dev\/mapper\/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            else
+              sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            fi
+            print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
+            pause_function
+            leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            break
+            ;;
+          2)
+            arch_chroot "syslinux-install_update -i"
+            if [[ $LUKS -eq 1 ]]; then
+              sed -i "s/APPEND root=.*/APPEND root=\/dev\/mapper\/${ROOT_PART} cryptdevice=\/dev\/${LUKS_DISK}:crypt ro/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            elif [[ $LVM -eq 1 ]]; then
+              sed -i "s/sda[0-9]/\/dev\/mapper\/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            else
+              sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            fi
+            print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
+            pause_function
+            leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            break
+            ;;
+          *)
+            invalid_option
+            ;;
+        esac
+      done
+      ;;
+    Gummiboot)
+      print_title "GUMMIBOOT - https://wiki.archlinux.org/index.php/Gummiboot"
+      print_info "Gummiboot is a UEFI boot manager written by Kay Sievers and Harald Hoyer. It is simple to configure, but can only start EFI executables, the Linux kernel EFISTUB, UEFI Shell, grub.efi, and such."
+      print_warning "\tGummiboot heavily suggests that /boot is mounted to the EFI partition, not /boot/efi, in order to simplify updating and configuration."
+ 
+      arch_chroot "gummiboot install"
+      print_warning "Please check your .conf file"
+      partuuid=`blkid -s PARTUUID ${ROOT_DISK} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
+      
+      if [[ $LUKS -eq 1 ]]; then
+            echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\tcryptdevice=\/dev\/${LUKS_DISK}:luks root=\/dev\/mapper\/${ROOT_PART} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+      elif [[ $LVM -eq 1 ]]; then
+            echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=\/dev\/mapper\/${ROOT_PART} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+      else
+            echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+      fi
+
+      echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}/boot/loader/loader.conf
+      pause_function
+      leafpad ${MOUNTPOINT}/boot/loader/entries/arch.conf
+      leafpad ${MOUNTPOINT}/boot/loader/loader.conf
+      ;;
+  esac
+  pause_function
+      
+}
+
+#ROOT PASSWORD {{{
+root_password(){
+  print_title "ROOT PASSWORD"
+  print_warning "Enter your new root password"
+  arch_chroot "passwd"
+  pause_function
+}
+
+#CREATE NEW USER
+# Modified /simplified  by Carl Duff from the AUI script. Option to pick default editor
+# has been removed, and arch_chroot functions added as this is not being run from the
+# installed system.
+  create_new_user(){
+	print_title "CREATE NEW USER - https://wiki.archlinux.org/index.php/Category:Network_managers"
+    read -p "Username: " username
+    arch_chroot "useradd -m -g users -G wheel,storage,power -s /bin/bash ${username}"
+    arch_chroot "passwd ${username}"
+    pause_function
+    if $(grep ${username} /etc/shadow | grep ! &> /dev/null ); then
+      create_new_user
+    else
+      arch_chroot "cp /etc/skel/.bashrc /home/${username}"
+      arch_chroot "chown -R ${username}:users /home/${username}"
+      arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
+    fi
+  }
+
+
+#INSTALL SYNAPTICS, XORG AND ALSA PACKAGES
+# Written by Carl Duff.
+install_alsa_xorg_input() {
+ print_title "INSTALL AUDIO, DISPLAY, AND INPUT PACKAGES"
+ print_info "Before installing graphics card driver(s) or desktop environments, other packages are needed first:"
+ echo
+ echo "1. alsa         - Advanced Linux Sound Architecture. Device drivers for sound cards."
+ echo "2. xorg-*       - Packages providing an open-source implementation of the X window system, needed for graphical interfaces."
+ echo "3. xf86-input-* - Packages providing open-source drivers for keyboards, touchpads, etc."
+ echo
+ print_warning "Once these packages have been installed, graphics card driver(s) will be installed."
+ pause_function
+ pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard
+ pause_function
+}
+
+#INSTALL GRAPHCS CARD DRIVER
+# Written by Carl Duff. This replaces the install_video_card and detect_vga functions.
+# The intention is to remove too much automation from the installation process.
+
+# Note: Might need to add configs for /etc/modprobe.d/modprobe.conf and /etc/mkinitcpio.conf
+install_graphics_card_driver(){
+  
+  #If a virtualbox installation has been detected, then this can be automated.
+  if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
+    print_title "VIRTUALBOX INSTALLATION DETECTED"
+    print_warning "As Arch is being installed in Virtualbox, the configuration process will be automated:"
+    print_info "- virtualbox-guest-utils and mesa-libgl packages will be installed"
+    print_info "- vboxguest, vboxsf, and vboxvideo kernel modules will be loaded via the modprobe command"
+    print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
+    echo
+    pause_function
+    pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl
+    arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"
+    arch_chroot "systemctl enable vboxservice"
+   else 
+   
+     print_title "GRAPHICS CARD CONFIGURATION"
+     print_info "Select your graphics card to determine package installation and configuration"
+     print_warning "- AMD's Catalyst driver is not officially supported by Arch Linux. Use Radeon instead."
+     print_warning "- The generic video driver VESA will also be installed by default as a fallback."
+     print_warning "- If your graphics card is not listed here - or you are not sure - pick VESA."
+     echo
+     gc_list=('Bumblebee (open-source)'  'Bumblebee (proprietary)' 'Intel' 'NVIDIA GeForce 8000 series + (proprietary)' 'NVIDIA GeForce 6/7000 series (proprietary)' 'Nouveau (NVIDIA open-source)' 'Radeon (open-source)' 'VESA (generic)')
+     PS3="$prompt1"
+     select OPT in "${gc_list[@]}"; do
+    case "$REPLY" in
+      1) pacstrap ${MOUNTPOINT} bumblebee xf86-video-nouveau nouveau-dri primus virtualgl mesa-libgl mesa xf86-video-vesa
+         arch_chroot "gpasswd -a ${username} bumblebee"
+         arch_chroot "systemctl enable bumblebeed"
+      ;;
+      2) pacstrap ${MOUNTPOINT} bumblebee intel-dri xf86-video-intel nvidia primus virtualgl pangox-compat xf86-video-vesa
+         arch_chroot "gpasswd -a ${username} bumblebee"
+         arch_chroot "systemctl enable bumblebeed"
+        ;;
+      3) pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa xf86-video-vesa
+        ;;
+      4) pacstrap ${MOUNTPOINT} nvidia primus virtualgl nvidia-utils pangox-compat xf86-video-vesa
+         arch_chroot "nvidia-xconfig --add-argb-glx-visuals --allow-glx-with-composite --composite -no-logo --render-accel -o /etc/X11/xorg.conf.d/20-nvidia.conf;"
+      ;;
+      5) pacstrap ${MOUNTPOINT} nvidia-304xx nvidia-304xx-libgl nvidia-304xx-utils xf86-video-vesa
+      ;;
+      6) pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri xf86-video-vesa
+      ;;
+      7) pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri xf86-video-vesa
+      ;;
+      8) pacstrap ${MOUNTPOINT} xf86-video-vesa mesa-libgl mesa
+      ;;
+      *) invalid_option ;;
+    esac
+  done
+  fi
+  pause_function
+}  
+
+#INSTALL DESKTOP ENVIRONMENT AND WINDOW MANAGER
+# Written by Carl Duff. adapted from and replaces the original install_desktop_environment function, along with its
+# multiple sub-functions. Again, this was for the purpose of simplification.
+install_de_wm(){
+  print_title "INSTALL DESKTOP ENVIRONMENT OR WINDOW MANAGER"
+  print_info "This option may be repeated to install multiple environments."
+  print_info "Once an environment has been installed, a network manager will automatically be installed and enabled. A one-time option to install some necessary extra packages may also be presented."
+  echo
+  echo "${BCyan}Full Desktop Environments${Reset}"
+  echo " 1) Cinnamon                   5) LXDE"
+  echo " 2) Enlightenment              6) MATE (2 options)"
+  echo " 3) Gnome 3  (4 options)       7) XFCE (2 options)"
+  echo " 4) KDE      (2 options)"
+  echo
+  echo "${BCyan}Window Managers${Reset}"
+  echo " 8) Awesome                   11) Openbox"
+  echo " 9) FluxBox                   12) PekWM"
+  echo "10) i3"     
+  echo ""
+  echo " b) Back to main menu"
+  echo
+  read_input $DESKTOPENV
+  
+  case "$OPTION" in
+    1) #Cinnamon
+       pacstrap ${MOUNTPOINT} cinnamon
+       arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+       NM_INSTALLED=1
+    ;;
+    2) #Enlightenment
+       pacstrap ${MOUNTPOINT} enlightenment terminology lxpolkit
+    ;;
+    3) #Gnome (4 choices)
+        print_title "GNOME"
+        print_info "There are three installation options available for Gnome."
+        echo " 1) Minimal              (gnome-shell)"
+        echo " 2) Minimal + Extensions (gnome-shell + gnome-shell-extensions)"
+        echo " 3) Full                 (gnome + gnome-shell-extensions)"
+        echo " 4) Full + Extras        (gnome + gnome-shell-extensions + gnome-extra)"
+        echo 
+        echo " b) Back"
+        echo ""
+        read_input $DE_CH
+        case "$OPTION" in
+        1) pacstrap ${MOUNTPOINT} gnome-shell gdm
+          ;;
+        2) pacstrap ${MOUNTPOINT} gnome-shell gnome-shell-extensions gdm
+          ;;
+        3) pacstrap ${MOUNTPOINT} gnome gnome-shell-extensions
+          ;;
+        4) pacstrap ${MOUNTPOINT} gnome gnome-shell-extensions gnome-extra
+          ;;
+        *) install_de_wm
+          ;;
+        esac
+        arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+        NM_INSTALLED=1
+        GNOME_INSTALLED=1
+    ;;    
+    4) #KDE (2 choices)
+        print_title "KDE"
+        print_info "There are two installation options available."
+        echo " 1) Minimal       (kdebase)"
+        echo " 2) Full          (kde)"
+        echo 
+        echo " b) Back"
+        echo ""
+        read_input $DE_CH
+        case "$OPTION" in
+        1) pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm kdm
+           KDE_INSTALLED=1
+          ;;
+        2) pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm
+           KDE_INSTALLED=1
+          ;;
+        *) install_de_wm
+          ;;
+        esac
+    ;;    
+    5) #LXDE 
+       pacstrap ${MOUNTPOINT} lxde
+       LXDE_INSTALLED=1
+    ;;
+    6) #MATE
+       print_title "MATE"
+       print_info "There are two installation options available."
+       echo " 1) Full          (mate)"
+       echo " 2) Full + Extras (mate + mate-extra)"
+       echo 
+       echo " b) Back"
+       echo ""
+       read_input $DE_CH
+       case "$OPTION" in
+       1) pacstrap ${MOUNTPOINT} mate
+          ;;
+       2) pacstrap ${MOUNTPOINT} mate mate-extra
+          ;;
+        *) install_de_wm
+          ;;
+        esac   
+    ;;
+    7) # XFCE
+       print_title "XFCE"
+       print_info "There are two installation options available."
+       echo " 1) Full          (xfce4)"
+       echo " 2) Full + Extras (xfce4 + xfce4-goodies)"
+       echo
+       echo " b) Back"
+       echo ""
+       read_input $DE_CH
+       case "$OPTION" in
+       1) pacstrap ${MOUNTPOINT} xfce4 lxpolkit
+          ;;
+       2) pacstrap ${MOUNTPOINT} xfce4 xfce4-goodies lxpolkit
+          ;;
+        *) install_de_wm
+          ;;
+        esac    
+    ;;
+    8) #Awesome
+       pacstrap ${MOUNTPOINT} awesome vicious lxpolkit 
+    ;;
+    9) #Fluxbox 
+       pacstrap ${MOUNTPOINT} fluxbox fbnews fluxter lxpolkit
+    ;;
+    10) #i3
+        pacstrap ${MOUNTPOINT} i3-wm i3lock i3status lxpolkit
+    ;;
+    11) #IceWM
+        pacstrap ${MOUNTPOINT} icewm icewm-utils icewm-themes lxpolkit
+    ;;
+    12) #Openbox
+        pacstrap ${MOUNTPOINT} openbox openbox-themes lxpolkit
+    ;;
+    13) #PekWM
+        pacstrap ${MOUNTPOINT} pekwm pekwm-themes lxpolkit   
+    ;;
+    b) break
+    ;;
+    *) invalid_option
+       install_de_wm
+ esac
+ pause_function          
+}
+
+#INSTALL COMMON PACKAGES
+# Written by Carl Duff. Installs basic/common packages required for functionalty.
+install_common(){
+ print_title "COMMON PACKAGES - RUN ONCE"
+ print_info "Some environments require common files to be installed, particularly for permissions and file manager functionality."
+ print_info "Experienced users may not wish to install these (i.e. manual configuration)."
+ print_warning "This is the only time you have the option!"
+ echo " 1) Yes, install these packages"
+ echo " 2) No, ${Bold}DO NOT${Reset} install these packages"
+ echo ""
+ read_input $DE_CH
+ 
+ if [[ $OPTION -eq 1 ]]; then
+    pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg
+ fi 
+ 
+ COMMON_INSTALLED=1
+}
+
+#INSTALL DISPLAY MANAGER
+# Written by Carl Duff. Detects if KDE and/or GNOME has been installed to ask which DM is desired. Otherwise
+# present choice between LXDM and LightDM. No SLiM as this seems to have issues.
+install_dm() {
+   if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
+         print_title "DISPLAY MANAGER: KDE INSTALLED"
+         print_info "As KDE has been installed, its native display manager - KDM - has now been enabled."
+         arch_chroot "systemctl enable kdm.service -f"
+         pause_function
+                  
+  elif   [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
+         print_title "DISPLAY MANAGER: GNOME INSTALLED"
+         print_info "As Gnome has been installed, its native display manager - GDM - has now been enabled."
+         arch_chroot "systemctl enable gdm.service -f"
+         pause_function
+  
+  elif   [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
+         print_title "DISPLAY MANAGER: KDE AND GNOME INSTALLED"
+         print_info "Both the KDE and Gnome Display Managers have been installed. Please choose one to enable."
+         echo " 1) GDM (Gnome)"
+         echo " 2) KDM (KDE)"
+         echo ""
+         read_input $DM_CH
+         case "$OPTION" in
+           1) arch_chroot "systemctl enable gdm.service -f"
+           ;;
+           *) arch_chroot "systemctl enable kdm.service -f"
+           ;;
+         esac
+         
+  elif   [[ $LXDE_INSTALLED -eq 1 ]]; then
+         print_title "DISPLAY MANAGER: LXDE INSTALLED"
+         print_info "As LXDE has been installed, its native display manager - LXDM - has now been enabled."
+         arch_chroot "systemctl enable lxdm.service -f"
+         pause_function
+         
+  elif   [[ $DM_INSTALLED -eq 0 ]]; then
+         print_title "DISPLAY MANAGER: INSTALL LXDM OR LIGHTDM"
+         print_info "Please choose between LXDM or LightDM. LXDM is recommended for beginners."
+         echo " 1) LXDM"
+         echo " 2) LightDM"
+         echo ""
+         read_input $DM_CH
+         case "$OPTION" in
+           1) pacstrap ${MOUNTPOINT} lxdm
+              arch_chroot "systemctl enable lxdm.service -f"
+           ;;
+           *) pacstrap ${MOUNTPOINT} lightdm lightdm-gtk2-greeter
+              arch_chroot "systemctl enable lightdm.service -f"
+           ;;
+         esac
+         DM_INSTALLED=1
+ 
+ else    print_title "DISPLAY MANAGER: ALREADY COMPLETED"
+         print_info "LXDM or LightDM has already been installed and enabled."
+         echo
+         pause_function
+ fi       
+ }        
+         
+
+#SET UP NETWORK FOR INSTALLED SYSTEM
+# Written by Carl Duff. 
+setup_network_manager(){
+  print_title "NETWORK MANAGEMENT"
+  print_info "Installing and enabling network manager"
+  pacstrap ${MOUNTPOINT} networkmanager network-manager-applet
+  arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+  NM_INSTALLED=1
+}
+
+
+
+#SET UP NETWORK FOR INSTALLED SYSTEM - Not used
+# Written by Carl Duff. 
+setup_network(){
+ print_title "NETWORK MANAGEMENT - https://wiki.archlinux.org/index.php/Category:Network_managers"
+ print_info "Network connection managers automatically manage wireless and wired interfaces."	
+ nm_list=('dhcpcd - Command Line' 'NetworkManager - Graphical Interface' 'WICD - Graphical Interface');
+  PS3="$prompt1"
+  select OPT in "${nm_list[@]}"; do
+    case "$REPLY" in
+      1) arch_chroot "systemctl enable dhcpcd.service"
+      ;;
+      2) pacstrap ${MOUNTPOINT} network-manager-applet
+         arch_chroot "systemctl disable dhcpcd.service && systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+        ;;
+      3) pacstrap ${MOUNTPOINT} wicd-gtk
+         arch_chroot "systemctl disable dhcpcd.service && systemctl enable wicd.service"
+        ;;
+      *) invalid_option ;;
+    esac
+  # Add bit here to test connection of installed system?
+  done
+  pause_function
+}
+
+    
+#}}}
+#FINISH {{{
+# Modified and simplified by Carl Duff. Removed code to copy AUI script to the installed system, 
+# and now automatically unmount partitions. and ask user to reboot their system manually.
+finish(){
+  umount_partitions
+  print_title "INSTALLATION COMPLETED!"
+  read_input_text "Reboot system? (Installed system can be booted from installation media if not removed): "
+  if [[ $OPTION == y ]]; then
+    reboot
+  fi
+  exit 0
+}
+#}}}
+
+# Modified by Carl Duff. Removed original check_connection option as new one implemented.
+print_title "Evo/Lution-AIS Arch Installer v0.1"
+check_boot_system
+echo
+print_info "Checking installer has been run as root, and that there is an active internet connection. Please wait..."
+check_evo_requirements
+print_info "${Green}All checks passed"
+pacman -Sy
+echo
+echo
+echo "Lution-AIS is based on the AIS and AUI scripts written by Helmuth Saatkamp."
+echo
+pause_function
+mainmenu() {
+while true
+do
+  print_title "Evo/Lution-AIS Arch Installer v0.1: MAIN MENU"
+  print_warning "Each step can be repeated, but must be followed IN ORDER from Step 3."
+  echo " 1) $(mainmenu_item "${checklist[1]}" "Select Installer Keyboard layout")"
+  echo " 2) $(mainmenu_item "${checklist[2]}" "Configure Mirrorlist")"
+  echo " 3) $(mainmenu_item "${checklist[3]}" "Partition Disk")"
+  echo " 4) $(mainmenu_item "${checklist[4]}" "Install Base System")"
+  echo " 5) $(mainmenu_item "${checklist[5]}" "Configure Fstab")"
+  echo " 6) $(mainmenu_item "${checklist[6]}" "Configure Hostname")"
+  echo " 7) $(mainmenu_item "${checklist[7]}" "Configure Timezone and Hardware Clock")"
+  echo " 8) $(mainmenu_item "${checklist[8]}" "Configure Keyboard Layout and System Locale")"
+  echo " 9) $(mainmenu_item "${checklist[9]}" "Configure Mkinitcpio")"
+  echo "10) $(mainmenu_item "${checklist[10]}" "Install Bootloader")"
+  echo "11) $(mainmenu_item "${checklist[11]}" "Configure Root Password")"
+  echo "12) $(mainmenu_item "${checklist[12]}" "Configure User Account")"
+  echo "13) $(mainmenu_item "${checklist[13]}" "Install Graphics, Input, and Sound Packages/Drivers")"
+  echo "14) $(mainmenu_item "${checklist[14]}" "Install Desktop Environment(s)")"  
+  echo "15) $(mainmenu_item "${checklist[15]}" "Install Display Manager (semi-automated)")"  
+  echo ""
+  echo " d) Done"
+  echo ""
+  read_input_options
+  for OPT in ${OPTIONS[@]}; do
+    case "$OPT" in
+      1)
+        select_keymap_xkb
+        checklist[1]=1
+        ;;
+      2)
+        configure_mirrorlist
+        checklist[2]=1
+        ;;
+      3)
+        umount_partitions
+        create_partition_scheme
+        format_partitions
+        checklist[3]=1
+        ;;
+      4)
+        install_base_system
+        checklist[4]=1
+        ;;
+      5)
+        configure_fstab
+        checklist[5]=1
+        ;;
+      6)
+        configure_hostname
+        checklist[6]=1
+        ;;
+      7)
+        configure_timezone
+        configure_hardwareclock
+        checklist[7]=1
+        ;;
+      8)
+        configure_keymap
+        configure_locale
+        checklist[8]=1
+        ;;
+      9)
+        configure_mkinitcpio
+        checklist[9]=1
+        ;;
+      10)
+        install_bootloader
+        configure_bootloader
+        checklist[10]=1
+        ;;
+      11)
+        root_password
+        checklist[11]=1
+        ;;
+      12)
+        create_new_user
+        checklist[12]=1
+        ;; 
+       13)
+        install_alsa_xorg_input
+        install_graphics_card_driver
+        checklist[13]=1
+        ;;     
+       14)
+         install_de_wm
+         checklist[14]=1
+        ;;
+       15)
+         install_dm
+
+         if [[ $NM_INSTALLED -eq 0 ]]; then
+            setup_network_manager
+         fi
+ 
+         if [[ $COMMON_INSTALLED -eq 0 ]]; then
+            install_common
+         fi
+         checklist[15]=1
+        ;;
+      "d")
+        finish
+        ;;
+      *)
+        mainmenu
+        ;;
+    esac
+  done
+done
+}
+mainmenu
+#}}}
