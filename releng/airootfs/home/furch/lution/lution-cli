@@ -831,9 +831,9 @@ install_de_wm(){
   echo " 4) KDE      (2 options)"
   echo
   echo "${BCyan}Window Managers${Reset}"
-  echo " 8) Awesome                   11) Openbox"
-  echo " 9) FluxBox                   12) PekWM"
-  echo "10) i3"     
+  echo " 8) Awesome                   11) IceWM"
+  echo " 9) FluxBox                   12) Openbox"
+  echo "10) i3                        13) PekWM"     
   echo ""
   echo " b) Back to main menu"
   echo
@@ -945,7 +945,7 @@ install_de_wm(){
         pacstrap ${MOUNTPOINT} i3-wm i3lock i3status lxpolkit
     ;;
     11) #IceWM
-        pacstrap ${MOUNTPOINT} icewm icewm-utils icewm-themes lxpolkit
+        pacstrap ${MOUNTPOINT} icewm icewm-themes lxpolkit
     ;;
     12) #Openbox
         pacstrap ${MOUNTPOINT} openbox openbox-themes lxpolkit
