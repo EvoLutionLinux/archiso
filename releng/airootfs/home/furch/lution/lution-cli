@@ -751,9 +751,9 @@ install_alsa_xorg_input() {
  print_title "INSTALL AUDIO, DISPLAY, AND INPUT PACKAGES"
  print_info "Before installing graphics card driver(s) or desktop environments, other packages are needed first:"
  echo
- echo "1. alsa         - Advanced Linux Sound Architecture. Device drivers for sound cards."
- echo "2. xorg-*       - Packages providing an open-source implementation of the X window system, needed for graphical interfaces."
- echo "3. xf86-input-* - Packages providing open-source drivers for keyboards, touchpads, etc."
+ print_info "alsa         - Advanced Linux Sound Architecture. Device drivers for sound cards."
+ print_info "xorg-*       - Packages providing an open-source implementation of the X window system, needed for graphical interfaces."
+ print_info "xf86-input-* - Packages providing open-source drivers for keyboards, touchpads, etc."
  echo
  print_warning "Once these packages have been installed, graphics card driver(s) will be installed."
  pause_function
@@ -889,7 +889,7 @@ install_de_wm(){
         echo ""
         read_input $DE_CH
         case "$OPTION" in
-        1) pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm kdm
+        1) pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm
            KDE_INSTALLED=1
           ;;
         2) pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm
@@ -1195,11 +1195,7 @@ do
         checklist[13]=1
         ;;     
        14)
-         install_de_wm
-         checklist[14]=1
-        ;;
-       15)
-         install_dm
+         install_de_wm         
 
          if [[ $NM_INSTALLED -eq 0 ]]; then
             setup_network_manager
@@ -1208,6 +1204,10 @@ do
          if [[ $COMMON_INSTALLED -eq 0 ]]; then
             install_common
          fi
+         checklist[14]=1
+        ;;
+       15)
+         install_dm
          checklist[15]=1
         ;;
       "d")
