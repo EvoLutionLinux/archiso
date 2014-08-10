@@ -40,23 +40,23 @@
     ##
     TEXT
     ${font sans:bold:size=32}${alignr}${color #d64937}Evo/${color #BEBEBE}Lution${voffset -16}${font sans:bold:size=22}${color #1793D1}Arch
-    ${font sans:bold:size=11}${alignr}${voffset -16}${color #BEBEBE}$machine 
+    ${font sans:bold:size=11}${alignr}${voffset -16}${color #BEBEBE}$machine   
     ${font sans:bold:size=12}${alignr}${color #d64937}Arch-based live ISO / ${color #BEBEBE}Multi-desktop installer 
     ${voffset -4}${color #BEBEBE}${hr 1}
     ${font sans:bold:size=22}${alignr}${color #d64937}Kernel ${color #BEBEBE}$kernel${voffset -12}
     ${font sans:bold:size=9}${alignr}${color #d64937}${color #d64937}CPU ${color #BEBEBE}${cpu cpu0}% ${color #B22222} / ${color #BEBEBE}${freq_g}Ghz ${color #BEBEBE} -  ${color #1793D1}${color #d64937}RAM ${color #BEBEBE}$mem ${color #B22222} / ${color #BEBEBE}$memmax${voffset 2} 
     ${font sans:bold:size=9}${alignr}${color #d64937}Battery ${color #BEBEBE}${battery_percent BAT0}%  -  ${color #d64937}Uptime ${color #BEBEBE}$uptime_short 
     ${hr 1}${voffset 6}
+    ${font sans:bold:size=12}${alignr}${color #d64937}Note: this is an alpha release for testing
 
     ${font sans:bold:size=9}${alignr}${color #1793D1}Right-Click Desktop 
     ${alignr}${color #BEBEBE}Desktop Menu${voffset -5} 
 
-    ${font sans:bold:size=9}${alignr}${color #1793D1}Super / Windows Key + l 
+    ${font sans:bold:size=9}${alignr}${color #1793D1}CTRL + i 
     ${alignr}${color #BEBEBE}Lution-AIS Installer${voffset -5} 
      
-    ${font sans:bold:size=9}${alignr}${color #1793D1}Super / Windows Key + t 
+    ${font sans:bold:size=9}${alignr}${color #1793D1}CTRL + t 
     ${alignr}${color #BEBEBE}Terminal${voffset -5} 
      
-    ${font sans:bold:size=9}${alignr}${color #1793D1}Super / Windows Key + x 
+    ${font sans:bold:size=9}${alignr}${color #1793D1}CTRL + x 
     ${alignr}${color #BEBEBE}Restart or Shutdown 
-
