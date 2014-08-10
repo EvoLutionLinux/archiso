@@ -1107,7 +1107,7 @@ install_de_wm(){
            NM_INSTALLED=1
            GNOME_INSTALLED=1
           ;;
-        2) pacstrap ${MOUNTPOINT} gnome gnome-shell-extensions
+        2) pacstrap ${MOUNTPOINT} gnome
            arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
            NM_INSTALLED=1
            GNOME_INSTALLED=1
