@@ -23,7 +23,7 @@
 
 # Ensure that the 'sharedfuncs_evo' script is present and source it
 if [[ -f `pwd`/sharedfuncs_evo ]]; then
-  source sharedfuncs_evo
+  source ./lution/sharedfuncs_evo
 else
   echo "This script requires the sharedfuncs_evo file to be present in the same directory. Closing."
   pause_function
