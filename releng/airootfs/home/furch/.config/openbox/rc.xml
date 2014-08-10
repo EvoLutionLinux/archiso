@@ -313,13 +313,19 @@
       </action>
     </keybind>
     <!-- Keybindings for running applications -->
-    <keybind key="W-e">
+    <keybind key="C-t">
       <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>Konqueror</name>
-        </startupnotify>
-        <command>kfmclient openProfile filemanagement</command>
+        <command>lxterminal</command>
+      </action>
+    </keybind>
+    <keybind key="C-i">
+      <action name="Execute">
+        <command>lxterminal -e sudo ~/lution/lution-ais</command>
+      </action>
+    </keybind>
+    <keybind key="C-x">
+      <action name="Execute">
+        <command>oblogout</command>
       </action>
     </keybind>
   </keyboard>
