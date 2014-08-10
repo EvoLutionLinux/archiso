@@ -313,17 +313,17 @@
       </action>
     </keybind>
     <!-- Keybindings for running applications -->
-    <keybind key="C-t">
+    <keybind key="A-t">
       <action name="Execute">
         <command>lxterminal</command>
       </action>
     </keybind>
-    <keybind key="C-i">
+    <keybind key="A-i">
       <action name="Execute">
         <command>lxterminal -e sudo ~/lution/lution-ais</command>
       </action>
     </keybind>
-    <keybind key="C-x">
+    <keybind key="A-x">
       <action name="Execute">
         <command>oblogout</command>
       </action>

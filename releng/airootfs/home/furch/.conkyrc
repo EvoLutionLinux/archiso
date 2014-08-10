@@ -52,11 +52,11 @@
     ${font sans:bold:size=9}${alignr}${color #1793D1}Right-Click Desktop 
     ${alignr}${color #BEBEBE}Desktop Menu${voffset -5} 
 
-    ${font sans:bold:size=9}${alignr}${color #1793D1}CTRL + i 
+    ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + i 
     ${alignr}${color #BEBEBE}Lution-AIS Installer${voffset -5} 
      
-    ${font sans:bold:size=9}${alignr}${color #1793D1}CTRL + t 
+    ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + t 
     ${alignr}${color #BEBEBE}Terminal${voffset -5} 
      
-    ${font sans:bold:size=9}${alignr}${color #1793D1}CTRL + x 
+    ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + x 
     ${alignr}${color #BEBEBE}Restart or Shutdown 
