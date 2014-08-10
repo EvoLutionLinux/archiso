@@ -20,39 +20,272 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-----------------------------------------------------------------------
 
+##
+## Set variables, colours, and prompts
+##
 
-# Ensure that the 'sharedfuncs_evo' script is present and source it
-if [[ -f `pwd`/sharedfuncs_evo ]]; then
-  source ./lution/sharedfuncs_evo
-else
-  echo "This script requires the sharedfuncs_evo file to be present in the same directory. Closing."
-  pause_function
-  exit 1
-fi
+# Menu and installation
+  checklist=( 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 )
+  KDE_INSTALLED=0
+  GNOME_INSTALLED=0
+  LXDE_INSTALLED=0
+  DM_INSTALLED=0
+  COMMON_INSTALLED=0
+  NM_INSTALLED=0
 
-#CHECK EVO REQUIREMENTS
+# Architecture
+  ARCHI=`uname -m`
+  UEFI=0
+  LVM=0
+  LUKS=0
+  LUKS_DISK="sda2"
+  EFI_DISK="/boot/efi"
+  ROOT_DISK="/dev/sda1"
+  BOOT_DISK="/dev/sda"
+
+# COLORS
+    Bold=$(tput bold)
+    Underline=$(tput sgr 0 1)
+    Reset=$(tput sgr0)
+ 
+    Red=$(tput setaf 1)
+    Green=$(tput setaf 2)
+    Yellow=$(tput setaf 3)
+    Blue=$(tput setaf 4)
+    Purple=$(tput setaf 5)
+    Cyan=$(tput setaf 6)
+    White=$(tput setaf 7)
+ 
+    BRed=${Bold}$(tput setaf 1)
+    BGreen=${Bold}$(tput setaf 2)
+    BYellow=${Bold}$(tput setaf 3)
+    BBlue=${Bold}$(tput setaf 4)
+    BPurple=${Bold}$(tput setaf 5)
+    BCyan=${Bold}$(tput setaf 6)
+    BWhite=${Bold}$(tput setaf 7)
+  
+# Prompts
+    prompt1="Enter your option: "
+    prompt2="Enter n° of options (ex: 1 2 3 or 1-3): "
+    prompt3="You have to manual enter the following commands, then press ${BYellow}ctrl+d${Reset} or type ${BYellow}exit${Reset}:"
+
+# Current Directory
+  AUI_DIR=`pwd`
+  MOUNTPOINT="/mnt"
+
+# Verbose mode
+  [[ $1 == -v || $1 == --verbose ]] && VERBOSE_MODE=1 || VERBOSE_MODE=0
+
+# Log file
+  LOG="${AUI_DIR}/`basename ${0}`_error.log"
+  [[ -f $LOG ]] && rm -f $LOG
+  PKG=""
+  PKG_FAIL="${AUI_DIR}/`basename ${0}`_pkg_fail_list.log"
+  [[ -f $PKG_FAIL ]] && rm -f $PKG_FAIL
+
+
+#
+# Set common functions
+#
+
+ error_msg() { 
+    local MSG="${1}"
+    echo -e "${MSG}"
+    exit 1
+ } 
+
+  cecho() { #{{{
+    echo -e "$1"
+    echo -e "$1" >>"$LOG"
+    tput sgr0;
+  }
+
+  check_boot_system() {
+    if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]; then
+      modprobe -r -q efivars || true  # if MAC
+    else
+      modprobe -q efivarfs            # all others
+    fi
+    if [[ -d "/sys/firmware/efi/" ]]; then
+      ## Mount efivarfs if it is not already mounted
+      if [[ -z $(mount | grep /sys/firmware/efi/efivars) ]]; then
+        mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+      fi
+      UEFI=1
+      echo "UEFI Mode detected"
+    else
+      UEFI=0
+      echo "BIOS Mode detected"
+    fi
+  }
+
+  read_input() {
+      read -p "$prompt1" OPTION
+  }
+  
+  read_input_text() {
+      read -p "$1 [y/N]: " OPTION
+      echo ""
+    OPTION=`echo "$OPTION" | tr '[:upper:]' '[:lower:]'`
+  } 
+
+ read_input_options() {
+    local line
+    local packages
+    if [[ $AUTOMATIC_MODE -eq 1 ]]; then
+      array=("$1")
+    else
+      read -p "$prompt2" OPTION
+      array=("$OPTION")
+    fi
+    for line in ${array[@]/,/ }; do
+      if [[ ${line/-/} != $line ]]; then
+        for ((i=${line%-*}; i<=${line#*-}; i++)); do
+          packages+=($i);
+        done
+      else
+        packages+=($line)
+      fi
+    done
+    OPTIONS=("${packages[@]}")
+  }
+
+  print_line() { 
+    printf "%$(tput cols)s\n"|tr ' ' '-'
+  }
+  print_title() {
+    clear
+    print_line
+    echo -e "# ${BBlue}$1${Reset}"
+    print_line
+    echo ""
+  }
+  
+  print_info() {
+    #Console width number
+    T_COLS=`tput cols`
+    echo -e "${Bold}$1${Reset}\n" | fold -sw $(( $T_COLS - 18 )) | sed 's/^/\t/'
+  }
+  
+  print_warning() {
+    T_COLS=`tput cols`
+    echo -e "${BYellow}$1${Reset}\n" | fold -sw $(( $T_COLS - 1 ))
+  }
+  
+  print_danger() {
+    T_COLS=`tput cols`
+    echo -e "${BRed}$1${Reset}\n" | fold -sw $(( $T_COLS - 1 ))
+  }
+
+  checkbox() {
+    #display [X] or [ ]
+    [[ "$1" -eq 1 ]] && echo -e "${BGreen}(${Reset}${Bold}#${BGreen})${Reset}" || echo -e "${BRed}( ${BRed})${Reset}";
+  }
+
+  contains_element() {
+    #check if an element exist in a string
+    for e in "${@:2}"; do [[ $e == $1 ]] && break; done;
+  }
+
+ invalid_option() {
+    print_line
+    echo "Invalid option. Try another one."
+    pause_function
+  }
+  
+  pause_function() {
+    print_line
+      read -e -sn 1 -p "Press enter to continue..."
+  }
+
+  mainmenu_item() { #{{{
+    echo -e "$(checkbox "$1") ${Bold}$2${Reset}"
+  }
+
+ arch_chroot() {
+    arch-chroot $MOUNTPOINT /bin/bash -c "${1}"
+  }
+ 
+  getkeymap_xkb() {
+    local keymaps_xkb=("af - Afghani" "al - Albanian" "et - Amharic" "ma - Arabic (Morocco)" "sy - Arabic (Syria)" "am - Armenian" "az - Azerbaijani" "ml - Bambara" "by - Belarusian" "be - Belgian" "bd - Bangla" "ba - Bosnian" "bg - Bulgarian" "mm - Burmese" "cn - Chinese" "hr - Croatian" "cz - Czech" "dk - Danish" "mv - Dhivehi" "nl - Dutch" "bt - Dzongkha" "cm - English (Cameroon)" "gh - English (Ghana)" "ng - English (Nigeria)" "za - English (South Africa)" "gb - English (UK)" "us - English (US)" "ee - Estonian" "fo - Faroese" "ph - Filipino" "fi - Finnish" "fr - French" "ca - French (Canada)" "cd - French (DR Congo)" "gn - French (Guinea)" "ge - Georgian" "de - German" "at - German (Austria)" "ch - German (Switzerland)" "gr - Greek" "il - Hebrew" "hu - Hungarian" "is - Icelandic" "in - Indian" "iq - Iraqi" "it - Italian" "ie - Irish" "jp - Japanese" "kz - Kazakh" "kh - Khmer (Cambodia)" "kr - Korean" "kg - Kyrgyz" "lv - Latvian" "la - Lao" "lt - Lithuanian" "mk - Macedonian" "mt - Maltese" "md - Moldavian" "mn - Mongolian" "me - Montenegrin" "np - Nepali" "no - Norwegian" "ir - Persian" "pl - Polish" "pt - Portuguese" "br - Portuguese (Brazil)" "ro - Romanian" "ru - Russian" "rs - Serbian" "si - Slovenian" "sk - Slovak" "es - Spanish" "se - Swedish" "tz - Swahili (Tanzania)" "ke - Swahili (Kenya)" "tw - Taiwanese" "tj - Tajik" "th - Thai" "bw - Tswana" "tr - Turkish" "tm - Turkmen" "ua - Ukrainian" "pk - Urdu (Pakistan)" "uz - Uzbek" "vn - Vietnamese" "sn - Wolof")
+    PS3="(shift+pgup/pgdown) $prompt1"
+    echo "Select keymap:"
+    select KEYMAP_XKB in "${keymaps_xkb[@]}"; do
+      if contains_element "$KEYMAP_XKB" "${keymaps_xkb[@]}"; then
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+
+  getkeymap() { 
+    local keymaps=(`localectl list-keymaps`)
+    PS3="(shift+pgup/pgdown) $prompt1"
+    echo "Select keymap:"
+    select KEYMAP in "${keymaps[@]}"; do
+      if contains_element "$KEYMAP" "${keymaps[@]}"; then
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+
+ setlocale() {
+    local locale_list=(`cat /etc/locale.gen | grep UTF-8 | sed 's/\..*$//' | sed '/@/d' | awk '{print $1}' | uniq | sed 's/#//g'`);
+    PS3="$prompt1"
+    echo "Select locale:"
+    select LOCALE in "${locale_list[@]}"; do
+      if contains_element "$LOCALE" "${locale_list[@]}"; then
+        LOCALE_UTF8="${LOCALE}.UTF-8"
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+  
+
+  settimezone() {
+    local zone=(`timedatectl list-timezones | sed 's/\/.*$//' | uniq`);
+    PS3="$prompt1"
+    echo "Select zone:"
+    select ZONE in "${zone[@]}"; do
+      if contains_element "$ZONE" "${zone[@]}"; then
+        local subzone=(`timedatectl list-timezones | grep ${ZONE} | sed 's/^.*\///'`)
+        PS3="$prompt1"
+        echo "Select subzone:"
+        select SUBZONE in "${subzone[@]}"; do
+          if contains_element "$SUBZONE" "${subzone[@]}"; then
+            break
+          else
+            invalid_option
+          fi
+        done
+        break
+      else
+        invalid_option
+      fi
+    done
+  }
+
 check_evo_requirements() {
-# Written by Carl Duff. Incorporates simplified networking check (the original
-# check_connection function is no longer used).
 
-# Check 1: Ensure that the script is being run with root privilages
+  if  [[ `whoami` != "root" ]]; 
+  then
+    print_danger "This script must be run with root privilages (i.e. the 'sudo' command)."
+    pause_function
+    exit 1
+  fi
 
-if  [[ `whoami` != "root" ]]; 
-then
-  print_danger "This script must be run with root privilages (i.e. the 'sudo' command)."
-  pause_function
-  exit 1
-fi
-
-# Check 2: Ensure that there is an active internet connection
-
-if ! [ "`ping -c 1 google.com`" ]; 
-then
-  echo 
-  print_danger "Connection test failed. You must run this script with an active internet connection."
-  pause_function
-  exit 1
-fi
+  if ! [ "`ping -c 1 google.com`" ]; 
+  then
+    echo 
+    print_danger "Connection test failed. You must run this script with an active internet connection."
+    pause_function
+    exit 1
+  fi
 }
 
 
