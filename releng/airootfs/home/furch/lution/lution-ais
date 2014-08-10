@@ -1349,6 +1349,7 @@ check_evo_requirements
 print_info "${Green}All checks passed"
 pacman -Sy
 echo
+print_warning "Please maximise this window for best results"
 echo
 echo "Lution-AIS is based on the AIS and AUI scripts written by Helmuth Saatkamp."
 echo
