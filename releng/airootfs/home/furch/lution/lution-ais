@@ -32,6 +32,7 @@
   DM_INSTALLED=0
   COMMON_INSTALLED=0
   NM_INSTALLED=0
+  KEYMAP_XKB="us"
 
 # Architecture
   ARCHI=`uname -m`
@@ -293,7 +294,7 @@ check_evo_requirements() {
 # Modified by Carl Duff to use the 'setxkbmap' command rather than 'loadkeys' for the installer terminal.
 select_keymap_xkb(){
   print_title "INSTALLER KEYBOARD LAYOUT"
-  print_info "The setxkbmap command defines the keyboard keymap to be used in the terminal."
+  print_info "The setxkbmap command defines the keyboard keymap to be used in this terminal. It will also be used to set the keyboard layout for your installed desktop environment(s) / window manager(s)."
   pause_function
   OPTION=n
   while [[ $OPTION != y ]]; do
@@ -409,10 +410,9 @@ create_partition_scheme(){
 # Modified by Carl Duff. Integrated Gparted, and dropped most of the other partitioning tools.
 create_partition(){
   print_title "CHOOSE PARTITIONING TOOL"
-  print_warning "It is not necessary to actually format the partitions created, as this will be undertaken later."
-  echo
   print_info "GParted is a user-friendly graphical tool that supports both BIOS and UEFI systems."
   print_info "Text-based tools available are cfdisk for BIOS systems (MBR), or gdisk for UEFI systems (GPT)."
+  print_warning "It is not necessary to actually format the partitions created, as this will be undertaken later."
   apps_list=("gparted" "cfdisk" "gdisk");
   PS3="$prompt1"
   echo -e "Select partition program:"
@@ -738,7 +738,7 @@ configure_fstab(){
 #CONFIGURE HOSTNAME {{{
 configure_hostname(){
   print_title "CONFIGURE HOSTNAME"
-  print_info "A host name is a unique name created to identify a machine on a network.Host names are restricted to alphanumeric characters.\nThe hyphen (-) can be used, but a host name cannot start or end with it. Length is restricted to 63 characters."
+  print_info "A host name is a unique name created to identify a machine on a network. Host names are restricted to alphanumeric characters.\nThe hyphen (-) can be used, but a host name cannot start or end with it. Length is restricted to 63 characters."
   echo
   read -p "Hostname [ex: archlinux]: " host_name
   echo "$host_name" > ${MOUNTPOINT}/etc/hostname
@@ -787,8 +787,8 @@ configure_hardwareclock(){
 # Modified by Carl DUff from the select_keymap function to configure the installed system.
 configure_keymap(){
   print_title "CONFIGURE KEYMAP"
-  print_info "The /etc/rc.conf file determines the keyboard layout in the installed system's virtual console."
-  print_info "Select the code appropriate to your keyboard layout."
+  print_info "The /etc/vconsole.conf file determines the keyboard layout in the installed system's virtual console. It is not used for desktop environments."
+  echo
   pause_function
   OPTION=n
   while [[ $OPTION != y ]]; do
@@ -801,7 +801,7 @@ configure_keymap(){
 #CONFIGURE LOCALE - INSTALLED SYSTEM
 configure_locale(){
   print_title "CONFIGURE LOCALE"
-  print_info "Locales define the language the user uses. They are codes starting with two lower-case letters followed by two upper-case letters."
+  print_info "Locales define the system language used. They are codes starting with two lower-case letters followed by two upper-case letters."
   print_info "The lower-case letters determine the language, and the upper-case letters determine the country. For example 'en_GB' means english, GREAT BRITAIN."
   pause_function
   OPTION=n
@@ -827,7 +827,7 @@ configure_mkinitcpio(){
 install_bootloader(){
   print_title "INSTALL BOOTLOADER"
   print_info "The boot loader is responsible for loading the kernel and initial RAM disk before initiating the boot process."
-  print_info "Grub2 is the de-facto choice for Linux users, and is therefore recommended for newer users."
+  print_info "Grub2 is the de-facto choice for Linux users, and is therefore recommended for beginners."
   print_warning "\tROOT Partition: ${ROOT_DISK}"
   print_warning "\tWARNING: There is no support for GRUB + LUKS/LVM."
   if [[ $UEFI -eq 1 ]]; then
@@ -945,9 +945,7 @@ configure_bootloader(){
       leafpad ${MOUNTPOINT}/boot/loader/entries/arch.conf
       leafpad ${MOUNTPOINT}/boot/loader/loader.conf
       ;;
-  esac
-  pause_function
-      
+  esac      
 }
 
 #ROOT PASSWORD {{{
@@ -997,6 +995,11 @@ install_alsa_xorg_input() {
  echo
  pause_function
  pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard
+ 
+ # Create the X11 keyboard configuration file for the installed system, and use the keymap input in the first option.
+   echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${KEYMAP_XKB:0:2}"\"\nEndSection" > ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
+
+ 
  pause_function
 }
 
@@ -1103,8 +1106,6 @@ install_de_wm(){
         read_input $DE_CH
         case "$OPTION" in
         1) pacstrap ${MOUNTPOINT} gnome-shell gdm
-           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
-           NM_INSTALLED=1
            GNOME_INSTALLED=1
           ;;
         2) pacstrap ${MOUNTPOINT} gnome
@@ -1213,7 +1214,7 @@ install_common(){
  print_title "COMMON PACKAGES - RUN ONCE"
  print_info "Some environments require common files to be installed, particularly for permissions and file manager functionality."
  print_info "Packages include: xterm, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc."
- print_info "Experienced users may not wish to install these (i.e. manual configuration)."
+ print_info "Experienced users may not wish to install these (i.e. undertake a manual installation)."
  print_warning "This is the only time you have the option!"
  echo " 1) Yes, install these packages"
  echo " 2) No, ${Bold}DO NOT${Reset} install these packages"
@@ -1256,6 +1257,7 @@ install_dm() {
            *) arch_chroot "systemctl enable kdm.service -f"
            ;;
          esac
+         pause_function
          
   elif   [[ $LXDE_INSTALLED -eq 1 ]]; then
          print_title "DISPLAY MANAGER: LXDE INSTALLED"
@@ -1265,7 +1267,7 @@ install_dm() {
          
   elif   [[ $DM_INSTALLED -eq 0 ]]; then
          print_title "INSTALL DISPLAY MANAGER: CHOOSE LXDM OR LIGHTDM"
-         print_info "Please choose between LXDM or LightDM. LXDM is the lighter of the two."
+         print_info "Please choose between LXDM or LightDM. LXDM is recommended for beginners."
          echo " 1) LXDM"
          echo " 2) LightDM"
          echo ""
@@ -1274,11 +1276,12 @@ install_dm() {
            1) pacstrap ${MOUNTPOINT} lxdm
               arch_chroot "systemctl enable lxdm.service -f"
            ;;
-           *) pacstrap ${MOUNTPOINT} lightdm lightdm-gtk2-greeter lightdm-gtk3-greeter
+           *) pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
               arch_chroot "systemctl enable lightdm.service -f"
            ;;
          esac
          DM_INSTALLED=1
+         pause_function
  
  else    print_title "INSTALL DISPLAY MANAGER: OPTION ALREADY COMPLETED"
          print_info "LXDM or LightDM has already been installed and enabled."
@@ -1358,15 +1361,15 @@ mainmenu() {
 while true
 do
   print_title "Evo/Lution-AIS Arch Installer v0.1: MAIN MENU"
-  print_warning "Each step can be repeated, but must be followed IN ORDER from Step 3."
-  echo " 1) $(mainmenu_item "${checklist[1]}" "Select Installer Keyboard layout (optional)")"
+  print_warning "Each step can be repeated, but must be followed IN ORDER."
+  echo " 1) $(mainmenu_item "${checklist[1]}" "Select Installer and Installed Desktop Keyboard layout")"
   echo " 2) $(mainmenu_item "${checklist[2]}" "Configure Mirrorlist (optional)")"
   echo " 3) $(mainmenu_item "${checklist[3]}" "Partition Disk")"
   echo " 4) $(mainmenu_item "${checklist[4]}" "Install Base System")"
   echo " 5) $(mainmenu_item "${checklist[5]}" "Configure Fstab")"
   echo " 6) $(mainmenu_item "${checklist[6]}" "Configure Hostname")"
   echo " 7) $(mainmenu_item "${checklist[7]}" "Configure Timezone and Hardware Clock")"
-  echo " 8) $(mainmenu_item "${checklist[8]}" "Configure Keyboard Layout and System Locale")"
+  echo " 8) $(mainmenu_item "${checklist[8]}" "Configure Virtual Console Keyboard Layout and System Locale")"
   echo " 9) $(mainmenu_item "${checklist[9]}" "Configure Mkinitcpio")"
   echo "10) $(mainmenu_item "${checklist[10]}" "Install Bootloader")"
   echo "11) $(mainmenu_item "${checklist[11]}" "Configure Root Password")"
