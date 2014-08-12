@@ -19,4 +19,4 @@ INCLUDE boot/syslinux/archiso_sys32.cfg
 3. Edit the packages.* files
 3a. Hash all packages in one file and unhash them in the other.
 
-4. Run ./build.sh for 64 bit, or ./build-32/sh for 32 bit.
+4. Run ./build.sh for 64 bit, or ./build-32.sh for 32 bit.
