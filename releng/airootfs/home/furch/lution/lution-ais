@@ -349,7 +349,7 @@ configure_mirrorlist(){
   fi
   # allow global read access (required for non-root yaourt execution)
   chmod +r /etc/pacman.d/mirrorlist
-  leafpad /etc/pacman.d/mirrorlist
+  gksu leafpad /etc/pacman.d/mirrorlist
 }
 #}}}
 #UMOUNT PARTITIONS {{{
@@ -419,7 +419,14 @@ create_partition(){
   select OPT in "${apps_list[@]}"; do
     if contains_element "$OPT" "${apps_list[@]}"; then
       select_device
-      $OPT ${device}
+      case $OPT in
+        gparted)
+          gksu gparted ${device}
+          ;;
+        *)
+          $OPT ${device}
+          ;;
+      esac
       break
     else
       invalid_option
@@ -732,7 +739,7 @@ configure_fstab(){
   echo "Review your fstab"
   [[ -f ${MOUNTPOINT}/swapfile ]] && sed -i "s/\\${MOUNTPOINT}//" ${MOUNTPOINT}/etc/fstab
   pause_function
-  leafpad ${MOUNTPOINT}/etc/fstab
+  gksu leafpad ${MOUNTPOINT}/etc/fstab
 }
 #}}}
 #CONFIGURE HOSTNAME {{{
@@ -900,7 +907,7 @@ configure_bootloader(){
             fi
             print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
             pause_function
-            leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
             break
             ;;
           2)
@@ -914,7 +921,7 @@ configure_bootloader(){
             fi
             print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
             pause_function
-            leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
             break
             ;;
           *)
@@ -942,8 +949,8 @@ configure_bootloader(){
 
       echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}/boot/loader/loader.conf
       pause_function
-      leafpad ${MOUNTPOINT}/boot/loader/entries/arch.conf
-      leafpad ${MOUNTPOINT}/boot/loader/loader.conf
+      gksu leafpad ${MOUNTPOINT}/boot/loader/entries/arch.conf
+      gksu leafpad ${MOUNTPOINT}/boot/loader/loader.conf
       ;;
   esac      
 }
