@@ -1150,7 +1150,9 @@ install_de_wm(){
         1) pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm
            KDE_INSTALLED=1
           ;;
-        2) pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm
+        2) pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
+           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+           NM_INSTALLED=1       
            KDE_INSTALLED=1
           ;;
         *) install_de_wm
@@ -1227,9 +1229,9 @@ install_de_wm(){
 # Written by Carl Duff. Installs basic/common packages required for functionalty.
 install_common(){
  print_title "COMMON PACKAGES - RUN ONCE"
- print_info "Some environments require common files to be installed, particularly for permissions and file manager functionality."
- print_info "Packages include: xterm, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc."
- print_info "Experienced users may not wish to install these (i.e. undertake a manual installation)."
+ print_info "Some environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality."
+ print_info "Packages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc."
+ print_info "Those installing the full KDE desktop alone will not need to install these."
  print_warning "This is the only time you have the option!"
  echo " 1) Yes, install these packages"
  echo " 2) No, ${Bold}DO NOT${Reset} install these packages"
