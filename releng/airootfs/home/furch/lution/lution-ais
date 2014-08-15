@@ -1103,8 +1103,9 @@ install_graphics_card_driver(){
         ;;
      *) invalid_option
         install_graphics_card_driver
+        ;;
      esac
-
+  fi
   pause_function
 }  
 
