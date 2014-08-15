@@ -1055,10 +1055,10 @@ install_graphics_card_driver(){
         pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa xf86-video-vesa
         ;;
      3) # NVIDIA / Nouveau
-        pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri xf86-video-vesa
+        pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa xf86-video-vesa
         ;;
      4) # AMD / Radeon
-        pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri xf86-video-vesa
+        pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa xf86-video-vesa
         ;;
      5) # VESA 
         pacstrap ${MOUNTPOINT} xf86-video-vesa mesa-libgl mesa
