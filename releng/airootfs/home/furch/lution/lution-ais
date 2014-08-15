@@ -1064,7 +1064,8 @@ install_graphics_card_driver(){
     else
        pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl
     fi
- 
+  
+    arch_chroot "depmod -a"
     arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"
     arch_chroot "systemctl enable vboxservice"
 
