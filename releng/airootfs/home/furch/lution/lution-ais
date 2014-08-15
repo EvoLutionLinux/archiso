@@ -924,8 +924,8 @@ configure_bootloader(){
             gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
             break
             ;;
-          *)
-            invalid_option
+          *) 
+             invalid_option
             ;;
         esac
       done
@@ -1003,7 +1003,7 @@ install_alsa_xorg_input() {
  pause_function
  pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard
  
- # Create the X11 keyboard configuration file for the installed system, and use the keymap input in the first option.
+ # Use the keymap input in the first option to create the X11 keyboard configuration file for the installed system
    echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${KEYMAP_XKB:0:2}"\"\nEndSection" > ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
 
  
@@ -1029,51 +1029,44 @@ install_graphics_card_driver(){
     pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl
     arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"
     arch_chroot "systemctl enable vboxservice"
+
+   # Otherwise, present the options for graphics card drivers
    else 
-   
      print_title "GRAPHICS CARD CONFIGURATION"
-     print_info "Select your graphics card to determine package installation and configuration"
+     print_warning "Only open source drivers are currently provided."
      print_info "- AMD's Catalyst driver is not officially supported by Arch Linux. Use Radeon instead."
-     print_info "- The generic video driver VESA will also be installed by default as a fallback."
-     print_info "- If your graphics card is not listed here - or you are not sure - pick VESA."
+     print_info "- Nouveau is the open source driver for NVIDIA graphics cards."
+     print_info "- If your graphics card is not listed here - or if you are not sure - pick VESA."
      echo
-     gc_list=('Bumblebee (open-source)'  'Bumblebee (proprietary)' 'Intel' 'NVIDIA GeForce 8000 series + (proprietary)' 'NVIDIA GeForce 6/7000 series (proprietary)' 'Nouveau (NVIDIA open-source)' 'Radeon (open-source)' 'VESA (generic)')
-     PS3="$prompt1"
-     select OPT in "${gc_list[@]}"; do
-    case "$REPLY" in
-      1) pacstrap ${MOUNTPOINT} bumblebee xf86-video-nouveau nouveau-dri primus virtualgl mesa-libgl mesa xf86-video-vesa
-         arch_chroot "gpasswd -a ${username} bumblebee"
-         arch_chroot "systemctl enable bumblebeed"
-         break
-         ;;
-      2) pacstrap ${MOUNTPOINT} bumblebee intel-dri xf86-video-intel nvidia primus virtualgl pangox-compat xf86-video-vesa
-         arch_chroot "gpasswd -a ${username} bumblebee"
-         arch_chroot "systemctl enable bumblebeed"
-         break
+     echo "1) Bumblebee"
+     echo "2) Intel"
+     echo "3) NVIDIA / Nouveau"
+     echo "4) AMD / Radeon"
+     echo "5) VESA (generic)"
+     echo
+     read_input $GRAPHICS_CARD
+     case "$OPTION" in
+     1) # Bumblebee
+        pacstrap ${MOUNTPOINT} bumblebee xf86-video-nouveau nouveau-dri primus virtualgl mesa-libgl mesa xf86-video-vesa
+        arch_chroot "gpasswd -a ${username} bumblebee"
+        arch_chroot "systemctl enable bumblebeed" 
+        ;;      
+     2) # Intel 
+        pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa xf86-video-vesa
         ;;
-      3) pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa xf86-video-vesa
-         break
-        ;;       
-      4) pacstrap ${MOUNTPOINT} nvidia primus virtualgl nvidia-utils pangox-compat xf86-video-vesa
-         arch_chroot "nvidia-xconfig --add-argb-glx-visuals --allow-glx-with-composite --composite -no-logo --render-accel -o /etc/X11/xorg.conf.d/20-nvidia.conf;"
-         break
-         ;;
-      5) pacstrap ${MOUNTPOINT} nvidia-304xx nvidia-304xx-libgl nvidia-304xx-utils xf86-video-vesa
-         break
-         ;;
-      6) pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri xf86-video-vesa
-         break
-         ;;
-      7) pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri xf86-video-vesa
-         break
-         ;;
-      8) pacstrap ${MOUNTPOINT} xf86-video-vesa mesa-libgl mesa
-         break
-         ;;
-      *) invalid_option ;;
-    esac
-  done
-  fi
+     3) # NVIDIA / Nouveau
+        pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri xf86-video-vesa
+        ;;
+     4) # AMD / Radeon
+        pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri xf86-video-vesa
+        ;;
+     5) # VESA 
+        pacstrap ${MOUNTPOINT} xf86-video-vesa mesa-libgl mesa
+        ;;
+     *) invalid_option
+        install_graphics_card_driver
+     esac
+
   pause_function
 }  
 
@@ -1133,7 +1126,8 @@ install_de_wm(){
            NM_INSTALLED=1
            GNOME_INSTALLED=1
           ;;
-        *) install_de_wm
+        *) invalid_option
+           install_de_wm
           ;;
         esac
     ;;    
@@ -1147,15 +1141,18 @@ install_de_wm(){
         echo ""
         read_input $DE_CH
         case "$OPTION" in
-        1) pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm
+        1) # KDE BASE
+           pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm
            KDE_INSTALLED=1
           ;;
-        2) pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
+        2) # KDE FULL
+           pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
            arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
            NM_INSTALLED=1       
            KDE_INSTALLED=1
           ;;
-        *) install_de_wm
+        *) invalid_option
+           install_de_wm
           ;;
         esac
     ;;    
