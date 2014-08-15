@@ -33,6 +33,7 @@
   COMMON_INSTALLED=0
   NM_INSTALLED=0
   KEYMAP_XKB="us"
+  LTS=0
 
 # Architecture
   ARCHI=`uname -m`
@@ -692,15 +693,39 @@ format_partitions(){
 }
 
 #INSTALL BASE SYSTEM
-# Modified / simplified by Carl Duff. Removed dhcpcd configuration aspect as a new networking option has been added.
+# Written by Carl Duff.
 install_base_system(){
   print_title "INSTALL BASE SYSTEM"
-  print_info "The pacstrap script will be used to install the base system and the base-devel package group."
-  pacstrap ${MOUNTPOINT} base base-devel btrfs-progs ntp sudo
-  local WIRELESS_DEV=`ip link | grep wlp | awk '{print $2}'| sed 's/://' | sed '1!d'`
-  if [[ -n $WIRELESS_DEV ]]; then
-    pacstrap ${MOUNTPOINT} iw wireless_tools wpa_actiond wpa_supplicant dialog
-  fi
+  print_warning "Where a wireless device has been detected, packages to support it will automatically be installed."
+  print_info "The latest kernel supports newer hardware (e.g. wireless cards). The Long Term Support kernel is more stable, and is supported far longer."
+  print_info "Whatever the kernel choice, the other can easily be added to an installed system to have both."
+  echo
+  echo "1) Latest Kernel"
+  echo "2) Latest Kernel + base-devel"
+  echo "3) Long Term Support (LTS) Kernel"
+  echo "4) Long Term Support (LTS) Kernel + base-devel"
+  echo
+  read_input $BASEOPT
+  
+  case "$OPTION" in
+    1) # Latest Kernel
+       pacstrap ${MOUNTPOINT} base btrfs-progs ntp sudo
+    ;;
+    2) # Latest Kernel and base-devel
+       pacstrap ${MOUNTPOINT} base base-devel btrfs-progs ntp sudo
+    ;;
+    3) # LTS Kernel
+       pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs btrfs-progs ntp sudo
+       LTS=1
+    ;;
+    4) # LTS Kernel and base-devel
+       pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs base-devel btrfs-progs ntp sudo
+       LTS=1
+    ;;
+    *) invalid_option
+       install_base_system
+    ;;
+  esac
 }
 #}}}
 
@@ -822,12 +847,19 @@ configure_locale(){
 }
 
 #CONFIGURE MKINITCPIO - INSTALLED SYSTEM
+# Amended by Carl Duff. Incorporates LTS kernel option.
 configure_mkinitcpio(){
   print_title "CONFIGURE MKINITCPIO"
   print_info "mkinitcpio is a Bash script used to create an initial ramdisk environment to load kernel modules."
   [[ $LUKS -eq 1 ]] && sed -i '/^HOOK/s/block/block keymap encrypt/' ${MOUNTPOINT}/etc/mkinitcpio.conf
   [[ $LVM -eq 1 ]] && sed -i '/^HOOK/s/filesystems/lvm2 filesystems/' ${MOUNTPOINT}/etc/mkinitcpio.conf
-  arch_chroot "mkinitcpio -p linux"
+  
+  # Determine if the LTS kernel installed or not, and run the appropriate mkinitcpio command
+  if [[ $LTS -eq 1 ]]; then
+     arch_chroot "mkinitcpio -p linux-lts"
+  else
+     arch_chroot "mkinitcpio -p linux"
+  fi
 }
 
 #INSTALL BOOTLOADER
@@ -1006,7 +1038,6 @@ install_alsa_xorg_input() {
  # Use the keymap input in the first option to create the X11 keyboard configuration file for the installed system
    echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${KEYMAP_XKB:0:2}"\"\nEndSection" > ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
 
- 
  pause_function
 }
 
@@ -1026,7 +1057,14 @@ install_graphics_card_driver(){
     print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
     echo
     pause_function
-    pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl
+    
+    # Determine if LTS kernel installed or not, and install the appropriate vb-guest-modules package
+    if [[ $LTS -eq 1 ]]; then
+       pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
+    else
+       pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl
+    fi
+ 
     arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"
     arch_chroot "systemctl enable vboxservice"
 
