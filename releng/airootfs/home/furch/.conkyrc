@@ -17,7 +17,7 @@
     own_window_hints below,sticky,skip_taskbar,skip_pager
     double_buffer yes
     minimum_size 450 1
-    maximum_width 600
+    maximum_width 450
     draw_shades no
     draw_outline no
     draw_borders no
@@ -39,15 +39,14 @@
     ## to identify your correct Wireless and Ethernet connection names (e.g. wlo1, eno1)
     ##
     TEXT
-    ${font sans:bold:size=32}${alignr}${color #d64937}Evo/${color #BEBEBE}Lution${voffset -16}${font sans:bold:size=22}${color #1793D1}Arch
-    ${font sans:bold:size=11}${alignr}${voffset -16}${color #BEBEBE}$machine   
-    ${font sans:bold:size=12}${alignr}${color #d64937}Arch-based live ISO / ${color #BEBEBE}Multi-desktop installer 
+    ${font sans:bold:size=32}${alignr}${color #d64937}Evo / ${color #BEBEBE}Lution-AIS${voffset -25}
+    ${font sans:bold:size=12}${alignr}${color #d64937}Live ISO / ${color #BEBEBE}Arch Linux Installer (${color #1793D1}$machine${color #BEBEBE})
     ${voffset -4}${color #BEBEBE}${hr 1}
-    ${font sans:bold:size=22}${alignr}${color #d64937}Kernel ${color #BEBEBE}$kernel${voffset -12}
+    ${font sans:bold:size=18}${alignr}${color #d64937}ISO Kernel ${color #BEBEBE}$kernel${voffset -11}
     ${font sans:bold:size=9}${alignr}${color #d64937}${color #d64937}CPU ${color #BEBEBE}${cpu cpu0}% ${color #B22222} / ${color #BEBEBE}${freq_g}Ghz ${color #BEBEBE} -  ${color #1793D1}${color #d64937}RAM ${color #BEBEBE}$mem ${color #B22222} / ${color #BEBEBE}$memmax${voffset 2} 
     ${font sans:bold:size=9}${alignr}${color #d64937}Battery ${color #BEBEBE}${battery_percent BAT0}%  -  ${color #d64937}Uptime ${color #BEBEBE}$uptime_short 
-    ${hr 1}${voffset 6}
-    ${font sans:bold:size=12}${alignr}${color #d64937}Note: this is an alpha release for testing
+    ${voffset 6}
+    ${font sans:bold:size=12}${alignr}${color #d64937}0.2 Beta release for testing
 
     ${font sans:bold:size=9}${alignr}${color #1793D1}Right-Click Desktop 
     ${alignr}${color #BEBEBE}Desktop Menu${voffset -5} 

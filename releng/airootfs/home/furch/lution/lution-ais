@@ -1,6 +1,6 @@
 # !/bin/bash
 #
-# Lution-AIS installer (version 0.1 - August 2014)
+# Lution-AIS installer (version 0.2 - August 2014)
 #
 # Based on the Arch Installation Script (AIS) and Arch Ultimate Installation 
 # script (AUI) written by helmuthdu (helmuthdu[at]gmail[dot]com). Modified by
@@ -168,7 +168,13 @@
     T_COLS=`tput cols`
     echo -e "${Bold}$1${Reset}\n" | fold -sw $(( $T_COLS - 18 )) | sed 's/^/\t/'
   }
-  
+ 
+   print_info_light() {
+    #Console width number
+    T_COLS=`tput cols`
+    echo -e "$1\n" | fold -sw $(( $T_COLS - 18 )) | sed 's/^/\t/'
+  }
+ 
   print_warning() {
     T_COLS=`tput cols`
     echo -e "${BYellow}$1${Reset}\n" | fold -sw $(( $T_COLS - 1 ))
@@ -295,7 +301,7 @@ check_evo_requirements() {
 # Modified by Carl Duff to use the 'setxkbmap' command rather than 'loadkeys' for the installer terminal.
 select_keymap_xkb(){
   print_title "INSTALLER KEYBOARD LAYOUT"
-  print_info "The setxkbmap command defines the keyboard keymap to be used in this terminal. It will also be used to set the keyboard layout for your installed desktop environment(s) / window manager(s)."
+  print_info "The setxkbmap command defines the keyboard keymap to be used in this terminal. It will also be used to set the keyboard layout for your installed desktop environment(s) / window manager(s), where installed."
   pause_function
   OPTION=n
   while [[ $OPTION != y ]]; do
@@ -696,10 +702,22 @@ format_partitions(){
 # Written by Carl Duff.
 install_base_system(){
   print_title "INSTALL BASE SYSTEM"
-  print_warning "Where a wireless device has been detected, packages to support it will automatically be installed."
-  print_info "The latest kernel supports newer hardware (e.g. wireless cards). The Long Term Support kernel is more stable, and is supported far longer."
+  print_info "Where a wireless device has been detected, packages to support it will be installed automatically."
+  print_info "The latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer."
   print_info "Whatever the kernel choice, the other can easily be added to an installed system to have both."
   echo
+  
+  if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
+     print_warning "If installing the LTS Kernel in VirtualBox, the necessary modules must be manually loaded using a terminal AFTER booting the installed system. This need only be done ONCE:"
+     echo " $ su"
+     echo " # depmod -a"
+     echo " # modprobe -a vboxvideo vboxguest vboxsf"
+     echo " # reboot" 
+  fi
+ 
+  echo
+  echo
+  echo "${BCyan}Kernel and base-devel selection${Reset}"
   echo "1) Latest Kernel"
   echo "2) Latest Kernel + base-devel"
   echo "3) Long Term Support (LTS) Kernel"
@@ -1005,6 +1023,7 @@ root_password(){
   create_new_user(){
 	print_title "CREATE NEW USER"
 	print_info "Enter your personal account username. You will then be asked for a password. This can be the same as that used for Root."
+    print_info "This option may be repeated to add any number of users."
     echo 
     read -p "Username: " username
     arch_chroot "useradd -m -g users -G wheel,storage,power -s /bin/bash ${username}"
@@ -1045,31 +1064,42 @@ install_alsa_xorg_input() {
 # Written by Carl Duff. This replaces the install_video_card and detect_vga functions.
 # The intention is to remove too much automation from the installation process.
 
-# Note: Might need to add configs for /etc/modprobe.d/modprobe.conf and /etc/mkinitcpio.conf
 install_graphics_card_driver(){
   
-  #If a virtualbox installation has been detected, then this can be automated.
+  # VirtualBox installation
   if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
     print_title "VIRTUALBOX INSTALLATION DETECTED"
-    print_warning "As Arch is being installed in Virtualbox, the configuration process will be automated:"
-    print_info "- virtualbox-guest-utils and mesa-libgl packages will be installed"
-    print_info "- vboxguest, vboxsf, and vboxvideo kernel modules will be loaded via the modprobe command"
-    print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
-    echo
-    pause_function
     
-    # Determine if LTS kernel installed or not, and install the appropriate vb-guest-modules package
+  # LTS Kernel installed 
     if [[ $LTS -eq 1 ]]; then
+       print_warning "As the LTS Kernel has been installed, the configuration process can only be semi-automated:"
+       print_info "- virtualbox-guest-utils, virtualbox-guest-modules-lts, and mesa-libgl packages will be installed."
+       print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
+       print_warning "After booting into the installed system, enter the following commands into the terminal to manually load the modules. This need only be done ONCE:"
+       echo " $ su"
+       echo " # depmod -a"
+       echo " # modprobe -a vboxvideo vboxguest vboxsf"
+       echo " # reboot" 
+       echo
+       pause_function
        pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
-    else
-       pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl
+    
+    else  
+    # Standard Kernel installed
+       print_warning "As Arch is being installed in Virtualbox, the configuration process will be automated:"
+       print_info "- virtualbox-guest-utils. virtualbox-guest-modules, and mesa-libgl packages will be installed"
+       print_info "- vboxguest, vboxsf, and vboxvideo kernel modules will be loaded via the modprobe command"
+       print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
+       echo
+       pause_function
+       pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl   
+       arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"   
     fi
   
-    arch_chroot "depmod -a"
-    arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"
+    # Enable vboxservice whatever the kernel type
     arch_chroot "systemctl enable vboxservice"
 
-   # Otherwise, present the options for graphics card drivers
+   # Real Hardware Installation
    else 
      print_title "GRAPHICS CARD CONFIGURATION"
      print_warning "Only open source drivers are currently provided."
@@ -1115,8 +1145,9 @@ install_graphics_card_driver(){
 # multiple sub-functions. Again, this was for the purpose of simplification.
 install_de_wm(){
   print_title "INSTALL DESKTOP ENVIRONMENT OR WINDOW MANAGER"
-  print_info "This option may be repeated to install multiple environments."
-  print_info "A network manager will be automatically installed and enabled. There may also be a one-time option presented to install some necessary extra packages."
+  print_warning "This option may be repeated to install multiple environments."
+  print_info "Gnome, Cinnamon, and KDE come with a network manager, which will automatically be enabled where downloaded."
+  print_info "There may be a one-time option presented to install some necessary extra packages after installation."
   echo
   echo "${BCyan}Full Desktop Environments${Reset}"
   echo " 1) Cinnamon                   5) LXDE"
@@ -1129,22 +1160,25 @@ install_de_wm(){
   echo " 9) FluxBox                   12) Openbox"
   echo "10) i3                        13) PekWM"     
   echo ""
-  echo " b) Back to main menu"
+  echo " b) Back"
   echo
   read_input $DESKTOPENV
   
   case "$OPTION" in
     1) #Cinnamon
        pacstrap ${MOUNTPOINT} cinnamon
-       arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
-       NM_INSTALLED=1
+       
+       if [[ $NM_INSTALLED -eq 0 ]]; then       
+          arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+          NM_INSTALLED=1
+       fi
     ;;
     2) #Enlightenment
        pacstrap ${MOUNTPOINT} enlightenment terminology lxpolkit
     ;;
     3) #Gnome (3 choices)
         print_title "GNOME"
-        print_info "There are three installation options available for Gnome."
+        print_info "There are three installation options available for Gnome. The Minimal option DOES NOT include a network manager."
         echo " 1) Minimal              (gnome-shell)"
         echo " 2) Full                 (gnome)"
         echo " 3) Full + Extras        (gnome + gnome-extra)"
@@ -1157,13 +1191,21 @@ install_de_wm(){
            GNOME_INSTALLED=1
           ;;
         2) pacstrap ${MOUNTPOINT} gnome
-           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
-           NM_INSTALLED=1
+
+           if [[ $NM_INSTALLED -eq 0 ]]; then       
+              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+              NM_INSTALLED=1
+           fi
+           
            GNOME_INSTALLED=1
           ;;
         3) pacstrap ${MOUNTPOINT} gnome gnome-extra
-           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
-           NM_INSTALLED=1
+
+           if [[ $NM_INSTALLED -eq 0 ]]; then       
+              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+              NM_INSTALLED=1
+           fi
+           
            GNOME_INSTALLED=1
           ;;
         *) invalid_option
@@ -1173,7 +1215,7 @@ install_de_wm(){
     ;;    
     4) #KDE (2 choices)
         print_title "KDE"
-        print_info "There are two installation options available."
+        print_info "There are two installation options available. The Minimal option DOES NOT include a network manager."
         echo " 1) Minimal       (kdebase)"
         echo " 2) Full          (kde)"
         echo 
@@ -1187,8 +1229,12 @@ install_de_wm(){
           ;;
         2) # KDE FULL
            pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
-           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
-           NM_INSTALLED=1       
+
+           if [[ $NM_INSTALLED -eq 0 ]]; then       
+              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+              NM_INSTALLED=1
+           fi
+               
            KDE_INSTALLED=1
           ;;
         *) invalid_option
@@ -1254,7 +1300,7 @@ install_de_wm(){
     13) #PekWM
         pacstrap ${MOUNTPOINT} pekwm pekwm-themes lxpolkit   
     ;;
-    b) break
+    "b") break
     ;;
     *) invalid_option
        install_de_wm
@@ -1265,14 +1311,14 @@ install_de_wm(){
 #INSTALL COMMON PACKAGES
 # Written by Carl Duff. Installs basic/common packages required for functionalty.
 install_common(){
- print_title "COMMON PACKAGES - RUN ONCE"
+ print_title "COMMON PACKAGES"
  print_info "Some environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality."
  print_info "Packages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc."
  print_info "Those installing the full KDE desktop alone will not need to install these."
  print_warning "This is the only time you have the option!"
  echo " 1) Yes, install these packages"
  echo " 2) No, ${Bold}DO NOT${Reset} install these packages"
- echo ""
+ echo
  read_input $DE_CH
  
  if [[ $OPTION -eq 1 ]]; then
@@ -1289,13 +1335,13 @@ install_dm() {
    if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
          print_title "DISPLAY MANAGER: KDE INSTALLED"
          print_info "As KDE has been installed, its native display manager - KDM - has now been enabled."
-         arch_chroot "systemctl enable kdm.service -f"
+         arch_chroot "systemctl enable kdm.service"
          pause_function
                   
   elif   [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
          print_title "DISPLAY MANAGER: GNOME INSTALLED"
          print_info "As Gnome has been installed, its native display manager - GDM - has now been enabled."
-         arch_chroot "systemctl enable gdm.service -f"
+         arch_chroot "systemctl enable gdm.service"
          pause_function
   
   elif   [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
@@ -1306,9 +1352,9 @@ install_dm() {
          echo ""
          read_input $DM_CH
          case "$OPTION" in
-           1) arch_chroot "systemctl enable gdm.service -f"
+           1) arch_chroot "systemctl enable gdm.service"
            ;;
-           *) arch_chroot "systemctl enable kdm.service -f"
+           *) arch_chroot "systemctl enable kdm.service"
            ;;
          esac
          pause_function
@@ -1316,23 +1362,33 @@ install_dm() {
   elif   [[ $LXDE_INSTALLED -eq 1 ]]; then
          print_title "DISPLAY MANAGER: LXDE INSTALLED"
          print_info "As LXDE has been installed, its native display manager - LXDM - has now been enabled."
-         arch_chroot "systemctl enable lxdm.service -f"
+         arch_chroot "systemctl enable lxdm.service"
          pause_function
          
   elif   [[ $DM_INSTALLED -eq 0 ]]; then
          print_title "INSTALL DISPLAY MANAGER: CHOOSE LXDM OR LIGHTDM"
+         print_warning "Some desktop environments come with a display manager by default, which will be detected in this section. Ensure all desired desktop environments have been installed first."
          print_info "Please choose between LXDM or LightDM. LXDM is recommended for beginners."
          echo " 1) LXDM"
          echo " 2) LightDM"
-         echo ""
+         echo
+         echo " b) Back"
+         echo
          read_input $DM_CH
          case "$OPTION" in
-           1) pacstrap ${MOUNTPOINT} lxdm
-              arch_chroot "systemctl enable lxdm.service -f"
-           ;;
-           *) pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
-              arch_chroot "systemctl enable lightdm.service -f"
-           ;;
+           1) # LXDM
+              pacstrap ${MOUNTPOINT} lxdm
+              arch_chroot "systemctl enable lxdm.service"
+              ;;
+           2) # LIGHTDM
+              pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
+              arch_chroot "systemctl enable lightdm.service"
+              ;;
+          "b") break
+              ;;
+           *) invalid_option
+              install_dm
+              ;;
          esac
          DM_INSTALLED=1
          pause_function
@@ -1344,41 +1400,56 @@ install_dm() {
  fi       
  }        
          
-
 #SET UP NETWORK FOR INSTALLED SYSTEM
-# Written by Carl Duff. 
 setup_network_manager(){
-  print_title "NETWORK MANAGEMENT"
-  print_info "Installing and enabling network manager"
-  pacstrap ${MOUNTPOINT} networkmanager network-manager-applet
-  arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
-  NM_INSTALLED=1
-}
-
-
-
-#SET UP NETWORK FOR INSTALLED SYSTEM - Not used
-# Written by Carl Duff. 
-setup_network(){
- print_title "NETWORK MANAGEMENT - https://wiki.archlinux.org/index.php/Category:Network_managers"
- print_info "Network connection managers automatically manage wireless and wired interfaces."	
- nm_list=('dhcpcd - Command Line' 'NetworkManager - Graphical Interface' 'WICD - Graphical Interface');
-  PS3="$prompt1"
-  select OPT in "${nm_list[@]}"; do
-    case "$REPLY" in
-      1) arch_chroot "systemctl enable dhcpcd.service"
-      ;;
-      2) pacstrap ${MOUNTPOINT} network-manager-applet
-         arch_chroot "systemctl disable dhcpcd.service && systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+ print_title "NETWORK MANAGEMENT"
+ 
+ if [[ $NM_INSTALLED -eq 0 ]]; then
+ 
+    print_warning "Some desktop environments come with a network manager by default, which will be automatically enabled. Ensure all desired desktop environments have been installed first."
+    print_info "Network connection managers can automatically manage wireless and wired interfaces."
+    print_info "Network Manager is recommended for beginners, especially where using a wireless connection."
+    echo
+    echo "${BCyan}Network Manager selection${Reset}"
+    echo "1) Connman (command line)"
+    echo "2) dhcpcd  (command line)"
+    echo "3) Network Manager (desktop graphical interface)"
+    echo "4) WICD (desktop graphical interface)"
+    echo
+    echo "b) Back"
+    echo
+    read_input $NETMANOPT
+  
+    case "$OPTION" in
+      1) # connman
+         pacstrap ${MOUNTPOINT} connman
+         arch_chroot "systemctl enable connman.service"
+         ;;
+      2) # dhcpcd
+         arch_chroot "systemctl enable dhcpcd.service"
+         ;;
+      3) # Network Manager
+         pacstrap ${MOUNTPOINT} networkmanager network-manager-applet
+         arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+         ;;
+      4) # WICD
+         pacstrap ${MOUNTPOINT} wicd-gtk
+         arch_chroot "systemctl enable wicd.service"
+         ;;
+     "b") break
+         ;;
+      *) invalid_option
+         setup_network_manager  
         ;;
-      3) pacstrap ${MOUNTPOINT} wicd-gtk
-         arch_chroot "systemctl disable dhcpcd.service && systemctl enable wicd.service"
-        ;;
-      *) invalid_option ;;
-    esac
-  # Add bit here to test connection of installed system?
-  done
-  pause_function
+     esac
+  
+ else
+  
+    print_info "A network manager has already been installed and enabled."
+    echo
+    pause_function
+  
+ fi
 }
 
     
@@ -1387,18 +1458,26 @@ setup_network(){
 # Modified and simplified by Carl Duff. Removed code to copy AUI script to the installed system, 
 # and now automatically unmount partitions. and ask user to reboot their system manually.
 finish(){
-  umount_partitions
   print_title "INSTALLATION COMPLETED!"
-  read_input_text "Reboot system? (Installed system can be booted from installation media if not removed): "
-  if [[ $OPTION == y ]]; then
-    reboot
+  umount_partitions
+  print_info "You can reboot or power off your system."
+
+  if [[ $LTS -eq 1 ]]; then
+     print_warning "After booting into the installed system, enter the following commands into the terminal to manually load the Virtualbox modules for the LTS kernel. This need only be done ONCE:"
+     echo " $ su"
+     echo " # depmod -a"
+     echo " # modprobe -a vboxvideo vboxguest vboxsf"
+     echo " # reboot" 
+     echo
   fi
+
+  pause_function
   exit 0
 }
 #}}}
 
 # Modified by Carl Duff. Removed original check_connection option as new one implemented.
-print_title "Evo/Lution-AIS Arch Installer v0.1"
+print_title "Evo/Lution-AIS Arch Installer v0.2"
 check_boot_system
 echo
 print_info "Checking installer has been run as root, and that there is an active internet connection. Please wait..."
@@ -1414,9 +1493,10 @@ pause_function
 mainmenu() {
 while true
 do
-  print_title "Evo/Lution-AIS Arch Installer v0.1: MAIN MENU"
+  print_title "Evo/Lution-AIS Arch Installer v0.2: MAIN MENU"
   print_warning "Each step can be repeated, but must be followed IN ORDER."
-  echo " 1) $(mainmenu_item "${checklist[1]}" "Select Installer and Installed Desktop Keyboard layout")"
+ echo "${BCyan}Base Installation${Reset}"
+  echo " 1) $(mainmenu_item "${checklist[1]}" "Configure Desktop Keyboard layout")"
   echo " 2) $(mainmenu_item "${checklist[2]}" "Configure Mirrorlist (optional)")"
   echo " 3) $(mainmenu_item "${checklist[3]}" "Partition Disk")"
   echo " 4) $(mainmenu_item "${checklist[4]}" "Install Base System")"
@@ -1424,13 +1504,16 @@ do
   echo " 6) $(mainmenu_item "${checklist[6]}" "Configure Hostname")"
   echo " 7) $(mainmenu_item "${checklist[7]}" "Configure Timezone and Hardware Clock")"
   echo " 8) $(mainmenu_item "${checklist[8]}" "Configure Virtual Console Keyboard Layout and System Locale")"
-  echo " 9) $(mainmenu_item "${checklist[9]}" "Configure Mkinitcpio")"
+  echo " 9) $(mainmenu_item "${checklist[9]}" "Run Mkinitcpio")"
   echo "10) $(mainmenu_item "${checklist[10]}" "Install Bootloader")"
   echo "11) $(mainmenu_item "${checklist[11]}" "Configure Root Password")"
-  echo "12) $(mainmenu_item "${checklist[12]}" "Configure User Account")"
-  echo "13) $(mainmenu_item "${checklist[13]}" "Install Graphics, Input, and Sound Packages/Drivers")"
-  echo "14) $(mainmenu_item "${checklist[14]}" "Install Desktop Environment(s)")"  
-  echo "15) $(mainmenu_item "${checklist[15]}" "Install Display Manager (semi-automated)")"  
+  echo "12) $(mainmenu_item "${checklist[12]}" "Configure User Account(s)")"
+  echo
+  echo "${BCyan}Desktop Installation${Reset}"
+  echo "13) $(mainmenu_item "${checklist[13]}" "Install ALSA, Xorg, Xf86-input, and Graphics Card Driver(s)")"
+  echo "14) $(mainmenu_item "${checklist[14]}" "Install Desktop Environment(s)")"
+  echo "15) $(mainmenu_item "${checklist[14]}" "Install Network Manager")"  
+  echo "16) $(mainmenu_item "${checklist[15]}" "Install Display Manager (semi-automated)")"  
   echo ""
   echo " d) Done"
   echo ""
@@ -1498,18 +1581,19 @@ do
        14)
          install_de_wm         
 
-         if [[ $NM_INSTALLED -eq 0 ]]; then
-            setup_network_manager
-         fi
- 
          if [[ $COMMON_INSTALLED -eq 0 ]]; then
             install_common
          fi
+         
          checklist[14]=1
         ;;
-       15)
+       15) 
+          setup_network_manager
+          checklist[15]=1
+        ;;        
+       16)
          install_dm
-         checklist[15]=1
+         checklist[16]=1
         ;;
       "d")
         finish
