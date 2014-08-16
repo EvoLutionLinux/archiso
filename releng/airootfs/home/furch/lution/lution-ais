@@ -1462,7 +1462,7 @@ finish(){
   umount_partitions
   print_info "You can reboot or power off your system."
 
-  if [[ $LTS -eq 1 ]]; then
+  if [[ $LTS -eq 1 ]] && [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
      print_warning "After booting into the installed system, enter the following commands into the terminal to manually load the Virtualbox modules for the LTS kernel. This need only be done ONCE:"
      echo " $ su"
      echo " # depmod -a"
