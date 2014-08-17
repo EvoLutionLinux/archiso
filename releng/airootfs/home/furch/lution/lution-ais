@@ -216,7 +216,7 @@
  
   getkeymap_xkb() {
     local keymaps_xkb=("af - Afghani" "al - Albanian" "et - Amharic" "ma - Arabic (Morocco)" "sy - Arabic (Syria)" "am - Armenian" "az - Azerbaijani" "ml - Bambara" "by - Belarusian" "be - Belgian" "bd - Bangla" "ba - Bosnian" "bg - Bulgarian" "mm - Burmese" "cn - Chinese" "hr - Croatian" "cz - Czech" "dk - Danish" "mv - Dhivehi" "nl - Dutch" "bt - Dzongkha" "cm - English (Cameroon)" "gh - English (Ghana)" "ng - English (Nigeria)" "za - English (South Africa)" "gb - English (UK)" "us - English (US)" "ee - Estonian" "fo - Faroese" "ph - Filipino" "fi - Finnish" "fr - French" "ca - French (Canada)" "cd - French (DR Congo)" "gn - French (Guinea)" "ge - Georgian" "de - German" "at - German (Austria)" "ch - German (Switzerland)" "gr - Greek" "il - Hebrew" "hu - Hungarian" "is - Icelandic" "in - Indian" "iq - Iraqi" "it - Italian" "ie - Irish" "jp - Japanese" "kz - Kazakh" "kh - Khmer (Cambodia)" "kr - Korean" "kg - Kyrgyz" "lv - Latvian" "la - Lao" "lt - Lithuanian" "mk - Macedonian" "mt - Maltese" "md - Moldavian" "mn - Mongolian" "me - Montenegrin" "np - Nepali" "no - Norwegian" "ir - Persian" "pl - Polish" "pt - Portuguese" "br - Portuguese (Brazil)" "ro - Romanian" "ru - Russian" "rs - Serbian" "si - Slovenian" "sk - Slovak" "es - Spanish" "se - Swedish" "tz - Swahili (Tanzania)" "ke - Swahili (Kenya)" "tw - Taiwanese" "tj - Tajik" "th - Thai" "bw - Tswana" "tr - Turkish" "tm - Turkmen" "ua - Ukrainian" "pk - Urdu (Pakistan)" "uz - Uzbek" "vn - Vietnamese" "sn - Wolof")
-    PS3="(shift+pgup/pgdown) $prompt1"
+    PS3="$prompt1"
     echo "Select keymap:"
     select KEYMAP_XKB in "${keymaps_xkb[@]}"; do
       if contains_element "$KEYMAP_XKB" "${keymaps_xkb[@]}"; then
@@ -229,7 +229,7 @@
 
   getkeymap() { 
     local keymaps=(`localectl list-keymaps`)
-    PS3="(shift+pgup/pgdown) $prompt1"
+    PS3="$prompt1"
     echo "Select keymap:"
     select KEYMAP in "${keymaps[@]}"; do
       if contains_element "$KEYMAP" "${keymaps[@]}"; then
@@ -1410,7 +1410,7 @@ setup_network_manager(){
     print_info "Network connection managers can automatically manage wireless and wired interfaces."
     print_info "Network Manager is recommended for beginners, especially where using a wireless connection."
     echo
-    echo "${BCyan}Network Manager selection${Reset}"
+    echo "${BCyan}Network Connection Manager Selection${Reset}"
     echo "1) Connman (command line)"
     echo "2) dhcpcd  (command line)"
     echo "3) Network Manager (desktop graphical interface)"
@@ -1512,7 +1512,7 @@ do
   echo "${BCyan}Desktop Installation${Reset}"
   echo "13) $(mainmenu_item "${checklist[13]}" "Install ALSA, Xorg, Xf86-input, and Graphics Card Driver(s)")"
   echo "14) $(mainmenu_item "${checklist[14]}" "Install Desktop Environment(s)")"
-  echo "15) $(mainmenu_item "${checklist[14]}" "Install Network Manager")"  
+  echo "15) $(mainmenu_item "${checklist[14]}" "Install Network Connection Manager")"  
   echo "16) $(mainmenu_item "${checklist[15]}" "Install Display Manager (semi-automated)")"  
   echo ""
   echo " d) Done"
