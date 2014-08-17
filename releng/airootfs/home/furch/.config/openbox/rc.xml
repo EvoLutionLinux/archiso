@@ -117,7 +117,7 @@
 
        use obconf if you want to change these without having to log out
        and back in -->
-    <number>1</number>
+    <number>2</number>
     <firstdesk>1</firstdesk>
     <names>
       <!-- set names up here if you want to, like this:
@@ -321,6 +321,11 @@
     <keybind key="A-i">
       <action name="Execute">
         <command>lxterminal -e sudo ~/lution/lution-ais</command>
+      </action>
+    </keybind>
+        <keybind key="A-g">
+      <action name="Execute">
+        <command>netsurf http://evolution.boardhost.com/viewtopic.php?id=62</command>
       </action>
     </keybind>
     <keybind key="A-x">
