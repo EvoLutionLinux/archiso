@@ -933,7 +933,7 @@ configure_bootloader(){
          arch_chroot "grub-install --target=x86_64-efi --efi-directory=${EFI_DISK} --bootloader-id=arch_grub --recheck"
       else
          arch_chroot "grub-install --target=i386-pc --recheck ${BOOT_DISK}"
-         fi
+      fi
      
       arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
       ;;
@@ -955,6 +955,12 @@ configure_bootloader(){
             else
               sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
             fi
+            
+            # If an LTS kernel has been installed, ensure syslinux.cfg is updated
+            if [[ $LTS -eq 1 ]]; then
+                sed -i 's/linux/linux-lts/' ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            fi
+            
             print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
             pause_function
             gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
@@ -969,6 +975,12 @@ configure_bootloader(){
             else
               sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
             fi
+            
+            # If an LTS kernel has been installed, ensure syslinux.cfg is updated
+            if [[ $LTS -eq 1 ]]; then
+                sed -i 's/linux/linux-lts/' ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+            fi
+            
             print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
             pause_function
             gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
@@ -1019,7 +1031,7 @@ root_password(){
 #CREATE NEW USER
 # Modified /simplified  by Carl Duff from the AUI script. Option to pick default editor
 # has been removed, and arch_chroot functions added as this is not being run from the
-# installed system.
+# installed system. This function is somewhat weak in respect to error handling.
   create_new_user(){
 	print_title "CREATE NEW USER"
 	print_info "Enter your personal account username. You will then be asked for a password. This can be the same as that used for Root."
@@ -1028,14 +1040,12 @@ root_password(){
     read -p "Username: " username
     arch_chroot "useradd -m -g users -G wheel,storage,power -s /bin/bash ${username}"
     arch_chroot "passwd ${username}"
+
+    arch_chroot "cp /etc/skel/.bashrc /home/${username}"
+    arch_chroot "chown -R ${username}:users /home/${username}"
+    arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
+
     pause_function
-    if $(grep ${username} /etc/shadow | grep ! &> /dev/null ); then
-      create_new_user
-    else
-      arch_chroot "cp /etc/skel/.bashrc /home/${username}"
-      arch_chroot "chown -R ${username}:users /home/${username}"
-      arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
-    fi
   }
 
 
@@ -1332,72 +1342,75 @@ install_common(){
 # Written by Carl Duff. Detects if KDE and/or GNOME has been installed to ask which DM is desired. Otherwise
 # present choice between LXDM and LightDM. No SLiM as this seems to have issues.
 install_dm() {
-   if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
-         print_title "DISPLAY MANAGER: KDE INSTALLED"
-         print_info "As KDE has been installed, its native display manager - KDM - has now been enabled."
-         arch_chroot "systemctl enable kdm.service"
-         pause_function
+	
+   if 	[[ $DM_INSTALLED -eq 0 ]]; then
+	
+         if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
+               print_title "DISPLAY MANAGER: KDE INSTALLED"
+               print_info "As KDE has been installed, its native display manager - KDM - has now been enabled."
+               arch_chroot "systemctl enable kdm.service"
+               pause_function
                   
-  elif   [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
-         print_title "DISPLAY MANAGER: GNOME INSTALLED"
-         print_info "As Gnome has been installed, its native display manager - GDM - has now been enabled."
-         arch_chroot "systemctl enable gdm.service"
-         pause_function
+         elif  [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
+               print_title "DISPLAY MANAGER: GNOME INSTALLED"
+               print_info "As Gnome has been installed, its native display manager - GDM - has now been enabled."
+               arch_chroot "systemctl enable gdm.service"
+               pause_function
   
-  elif   [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
-         print_title "DISPLAY MANAGER: KDE AND GNOME INSTALLED"
-         print_info "Both the KDE and Gnome Display Managers have been installed. Please choose one to enable."
-         echo " 1) GDM (Gnome)"
-         echo " 2) KDM (KDE)"
-         echo ""
-         read_input $DM_CH
-         case "$OPTION" in
-           1) arch_chroot "systemctl enable gdm.service"
-           ;;
-           *) arch_chroot "systemctl enable kdm.service"
-           ;;
-         esac
-         pause_function
+         elif  [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
+               print_title "DISPLAY MANAGER: KDE AND GNOME INSTALLED"
+               print_info "Both the KDE and Gnome Display Managers have been installed. Please choose one to enable."
+               echo " 1) GDM (Gnome)"
+               echo " 2) KDM (KDE)"
+               echo ""
+               read_input $DM_CH
+               case "$OPTION" in
+                    1) arch_chroot "systemctl enable gdm.service"
+                       ;;
+                    *) arch_chroot "systemctl enable kdm.service"
+                       ;;
+               esac
+               pause_function
          
-  elif   [[ $LXDE_INSTALLED -eq 1 ]]; then
-         print_title "DISPLAY MANAGER: LXDE INSTALLED"
-         print_info "As LXDE has been installed, its native display manager - LXDM - has now been enabled."
-         arch_chroot "systemctl enable lxdm.service"
-         pause_function
-         
-  elif   [[ $DM_INSTALLED -eq 0 ]]; then
-         print_title "INSTALL DISPLAY MANAGER: CHOOSE LXDM OR LIGHTDM"
-         print_warning "Some desktop environments come with a display manager by default, which will be detected in this section. Ensure all desired desktop environments have been installed first."
-         print_info "Please choose between LXDM or LightDM. LXDM is recommended for beginners."
-         echo " 1) LXDM"
-         echo " 2) LightDM"
-         echo
-         echo " b) Back"
-         echo
-         read_input $DM_CH
-         case "$OPTION" in
-           1) # LXDM
-              pacstrap ${MOUNTPOINT} lxdm
+         elif [[ $LXDE_INSTALLED -eq 1 ]]; then
+              print_title "DISPLAY MANAGER: LXDE INSTALLED"
+              print_info "As LXDE has been installed, its native display manager - LXDM - has now been enabled."
               arch_chroot "systemctl enable lxdm.service"
-              ;;
-           2) # LIGHTDM
-              pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
-              arch_chroot "systemctl enable lightdm.service"
-              ;;
-          "b") break
-              ;;
-           *) invalid_option
-              install_dm
-              ;;
-         esac
+              pause_function
+         
+         else print_title "INSTALL DISPLAY MANAGER: CHOOSE LXDM OR LIGHTDM"
+              print_warning "Some desktop environments come with a display manager by default, which will be detected in this section. Ensure all desired desktop environments have been installed first."
+              print_info "Please choose between LXDM or LightDM. LXDM is recommended for beginners."
+              echo " 1) LXDM"
+              echo " 2) LightDM"
+              echo
+              echo " b) Back"
+              echo
+              read_input $DM_CH
+              case "$OPTION" in
+                   1) # LXDM
+                      pacstrap ${MOUNTPOINT} lxdm
+                      arch_chroot "systemctl enable lxdm.service"
+                      ;;
+                   2) # LIGHTDM
+                      pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
+                      arch_chroot "systemctl enable lightdm.service"
+                      ;;
+                 "b") break
+                      ;;
+                   *) invalid_option
+                      install_dm
+                      ;;
+              esac
+         fi     
          DM_INSTALLED=1
          pause_function
  
- else    print_title "INSTALL DISPLAY MANAGER: OPTION ALREADY COMPLETED"
-         print_info "LXDM or LightDM has already been installed and enabled."
+   else  print_title "INSTALL DISPLAY MANAGER: OPTION ALREADY COMPLETED"
+         print_info "A display manager has already been installed and enabled."
          echo
          pause_function
- fi       
+   fi       
  }        
          
 #SET UP NETWORK FOR INSTALLED SYSTEM
@@ -1442,7 +1455,8 @@ setup_network_manager(){
          setup_network_manager  
         ;;
      esac
-  
+     NM_INSTALLED=1
+     
  else
   
     print_info "A network manager has already been installed and enabled."
