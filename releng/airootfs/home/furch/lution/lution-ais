@@ -1034,8 +1034,11 @@ root_password(){
 # installed system. This function is somewhat weak in respect to error handling.
   create_new_user(){
 	print_title "CREATE NEW USER"
-	print_info "Enter your personal account username. You will then be asked for a password. This can be the same as that used for Root."
-    print_info "This option may be repeated to add any number of users."
+	print_warning "If mis-matching passwords are entered, then just repeat this step for the same user name."
+	print_info "Enter your personal account username. You will then be asked for a password. This option may also be repeated to add any number of users."
+    print_info "- The user will be added to the Wheel group"
+    print_info "- A home directory will be created based on the /etc/.skel/ profile, and ownership given to the user"
+    print_info "- The sudoers file will be amended to give permissions to members of the Wheel group"
     echo 
     read -p "Username: " username
     arch_chroot "useradd -m -g users -G wheel,storage,power -s /bin/bash ${username}"
@@ -1157,6 +1160,7 @@ install_de_wm(){
   print_title "INSTALL DESKTOP ENVIRONMENT OR WINDOW MANAGER"
   print_warning "This option may be repeated to install multiple environments."
   print_info "Gnome, Cinnamon, and KDE come with a network manager, which will automatically be enabled where downloaded."
+  print_info "Gnome, KDE and LXDE come with a display manager, which will be enabled when selecting the display manager step."
   print_info "There may be a one-time option presented to install some necessary extra packages after installation."
   echo
   echo "${BCyan}Full Desktop Environments${Reset}"
@@ -1179,7 +1183,7 @@ install_de_wm(){
        pacstrap ${MOUNTPOINT} cinnamon
        
        if [[ $NM_INSTALLED -eq 0 ]]; then       
-          arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+          arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
           NM_INSTALLED=1
        fi
     ;;
@@ -1203,7 +1207,7 @@ install_de_wm(){
         2) pacstrap ${MOUNTPOINT} gnome
 
            if [[ $NM_INSTALLED -eq 0 ]]; then       
-              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
               NM_INSTALLED=1
            fi
            
@@ -1212,7 +1216,7 @@ install_de_wm(){
         3) pacstrap ${MOUNTPOINT} gnome gnome-extra
 
            if [[ $NM_INSTALLED -eq 0 ]]; then       
-              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
               NM_INSTALLED=1
            fi
            
@@ -1241,7 +1245,7 @@ install_de_wm(){
            pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
 
            if [[ $NM_INSTALLED -eq 0 ]]; then       
-              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
               NM_INSTALLED=1
            fi
                
@@ -1349,13 +1353,11 @@ install_dm() {
                print_title "DISPLAY MANAGER: KDE INSTALLED"
                print_info "As KDE has been installed, its native display manager - KDM - has now been enabled."
                arch_chroot "systemctl enable kdm.service"
-               pause_function
                   
          elif  [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
                print_title "DISPLAY MANAGER: GNOME INSTALLED"
                print_info "As Gnome has been installed, its native display manager - GDM - has now been enabled."
                arch_chroot "systemctl enable gdm.service"
-               pause_function
   
          elif  [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
                print_title "DISPLAY MANAGER: KDE AND GNOME INSTALLED"
@@ -1370,7 +1372,6 @@ install_dm() {
                     *) arch_chroot "systemctl enable kdm.service"
                        ;;
                esac
-               pause_function
          
          elif [[ $LXDE_INSTALLED -eq 1 ]]; then
               print_title "DISPLAY MANAGER: LXDE INSTALLED"
@@ -1443,7 +1444,7 @@ setup_network_manager(){
          ;;
       3) # Network Manager
          pacstrap ${MOUNTPOINT} networkmanager network-manager-applet
-         arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service && systemctl enable ModemManager.service"
+         arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
          ;;
       4) # WICD
          pacstrap ${MOUNTPOINT} wicd-gtk
