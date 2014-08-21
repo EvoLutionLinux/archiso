@@ -705,6 +705,7 @@ install_base_system(){
   print_info "Where a wireless device has been detected, packages to support it will be installed automatically."
   print_info "The latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer."
   print_info "Whatever the kernel choice, the other can easily be added to an installed system to have both."
+  print_info "The base-devel package group is needed where intending to use the Arch User Repository (AUR)."
   echo
   
   if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
@@ -751,7 +752,8 @@ install_base_system(){
 #CONFIGURE FSTAB {{{
 configure_fstab(){
   print_title "CONFIGURE FSTAB"
-  print_info "The /etc/fstab file contains static filesystem information. It defines how storage devices and partitions are to be mounted and integrated into the overall system. It is read by the mount command to determine which options to use when mounting a specific partition or partition."
+  print_info "The /etc/fstab (File System TABle) file determines what storage devices and partitions are to be mounted, and how they are to be used."
+  echo
   if [[ ! -f ${MOUNTPOINT}/etc/fstab.aui ]]; then
     cp ${MOUNTPOINT}/etc/fstab ${MOUNTPOINT}/etc/fstab.aui
   else
@@ -790,7 +792,7 @@ configure_hostname(){
   print_title "CONFIGURE HOSTNAME"
   print_info "A host name is a unique name created to identify a machine on a network. Host names are restricted to alphanumeric characters.\nThe hyphen (-) can be used, but a host name cannot start or end with it. Length is restricted to 63 characters."
   echo
-  read -p "Hostname [ex: archlinux]: " host_name
+  read -p "Hostname (e.g.: arch): " host_name
   echo "$host_name" > ${MOUNTPOINT}/etc/hostname
   if [[ ! -f ${MOUNTPOINT}/etc/hosts.aui ]]; then
     cp ${MOUNTPOINT}/etc/hosts ${MOUNTPOINT}/etc/hosts.aui
@@ -1377,7 +1379,6 @@ install_dm() {
               print_title "DISPLAY MANAGER: LXDE INSTALLED"
               print_info "As LXDE has been installed, its native display manager - LXDM - has now been enabled."
               arch_chroot "systemctl enable lxdm.service"
-              pause_function
          
          else print_title "INSTALL DISPLAY MANAGER: CHOOSE LXDM OR LIGHTDM"
               print_warning "Some desktop environments come with a display manager by default, which will be detected in this section. Ensure all desired desktop environments have been installed first."
