@@ -1184,7 +1184,7 @@ install_de_wm(){
     1) #Cinnamon
        pacstrap ${MOUNTPOINT} cinnamon
        
-       if [[ $NM_INSTALLED -eq 0 ]]; then       
+       if [[ $NM_INSTALLED -eq 0 ]]; then      
           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
           NM_INSTALLED=1
        fi
@@ -1208,7 +1208,7 @@ install_de_wm(){
           ;;
         2) pacstrap ${MOUNTPOINT} gnome
 
-           if [[ $NM_INSTALLED -eq 0 ]]; then       
+           if [[ $NM_INSTALLED -eq 0 ]]; then         
               arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
               NM_INSTALLED=1
            fi
@@ -1217,7 +1217,7 @@ install_de_wm(){
           ;;
         3) pacstrap ${MOUNTPOINT} gnome gnome-extra
 
-           if [[ $NM_INSTALLED -eq 0 ]]; then       
+           if [[ $NM_INSTALLED -eq 0 ]]; then         
               arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
               NM_INSTALLED=1
            fi
@@ -1246,7 +1246,7 @@ install_de_wm(){
         2) # KDE FULL
            pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
 
-           if [[ $NM_INSTALLED -eq 0 ]]; then       
+           if [[ $NM_INSTALLED -eq 0 ]]; then          
               arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
               NM_INSTALLED=1
            fi
@@ -1418,7 +1418,7 @@ install_dm() {
 #SET UP NETWORK FOR INSTALLED SYSTEM
 setup_network_manager(){
  print_title "NETWORK MANAGEMENT"
- 
+    
  if [[ $NM_INSTALLED -eq 0 ]]; then
  
     print_warning "Some desktop environments come with a network manager by default, which will be automatically enabled. Ensure all desired desktop environments have been installed first."
@@ -1437,7 +1437,7 @@ setup_network_manager(){
   
     case "$OPTION" in
       1) # connman
-         pacstrap ${MOUNTPOINT} connman
+         pacstrap ${MOUNTPOINT} connman 
          arch_chroot "systemctl enable connman.service"
          ;;
       2) # dhcpcd
@@ -1475,6 +1475,7 @@ setup_network_manager(){
 # and now automatically unmount partitions. and ask user to reboot their system manually.
 finish(){
   print_title "INSTALLATION COMPLETED!"
+  arch_chroot "uuidgen | { read; echo "${REPLY//-}">/etc/machine-id; }" #fix for systemd 216-1
   umount_partitions
   print_info "You can reboot or power off your system."
 

@@ -9,6 +9,7 @@ ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 
 usermod -s /bin/bash root
 cp -aT /etc/skel/ /root/
+chmod 700 /root
 
 useradd -m -p "" -g users -G "adm,audio,floppy,log,network,rfkill,scanner,storage,optical,power,wheel" -s /bin/bash furch
 
@@ -19,4 +20,6 @@ chown -R furch:users /home/furch
 sed -i "s/#Server/Server/g" /etc/pacman.d/mirrorlist
 sed -i 's/#\(Storage=\)auto/\1volatile/' /etc/systemd/journald.conf
 
-systemctl enable multi-user.target pacman-init.service choose-mirror.service
+systemctl enable pacman-init.service choose-mirror.service
+systemctl set-default multi-user.target
+uuidgen | { read; echo "${REPLY//-}">/etc/machine-id; }
