@@ -1126,7 +1126,8 @@ install_graphics_card_driver(){
      echo "2) Intel"
      echo "3) NVIDIA / Nouveau"
      echo "4) AMD / Radeon"
-     echo "5) VESA (generic)"
+     echo "5) VMWare"
+     echo "6) VESA (generic)"
      echo
      read_input $GRAPHICS_CARD
      case "$OPTION" in
@@ -1144,7 +1145,10 @@ install_graphics_card_driver(){
      4) # AMD / Radeon
         pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa xf86-video-vesa
         ;;
-     5) # VESA 
+     5) # VMWARE
+        pacstrap ${MOUNTPOINT} xf86-video-vmware mesa-libgl mesa xf86-video-vesa
+        ;;
+     6) # VESA 
         pacstrap ${MOUNTPOINT} xf86-video-vesa mesa-libgl mesa
         ;;
      *) invalid_option
@@ -1475,8 +1479,15 @@ setup_network_manager(){
 # and now automatically unmount partitions. and ask user to reboot their system manually.
 finish(){
   print_title "INSTALLATION COMPLETED!"
-  arch_chroot "uuidgen | { read; echo "${REPLY//-}">/etc/machine-id; }" #fix for systemd 216-1
-  umount_partitions
+  
+  # Fix for systemd.
+  #if [[ -e ${MOUNTPOINT}/etc/machine-id ]]; then
+     umount_partitions
+  #else
+  #   arch_chroot "uuidgen | { read; echo "${REPLY//-}">/etc/machine-id; }"
+  #   umount_partitions
+  #fi
+  
   print_info "You can reboot or power off your system."
 
   if [[ $LTS -eq 1 ]] && [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
