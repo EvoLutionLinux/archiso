@@ -1,365 +1,378 @@
 # !/bin/bash
 #
-# Lution-AIS installer (version 0.2 - August 2014)
+# Lution-AIS installer (version 0.3 - September 2014)
 #
-# Based on the Arch Installation Script (AIS) and Arch Ultimate Installation 
-# script (AUI) written by helmuthdu (helmuthdu[at]gmail[dot]com). Modified by
-# Carl Duff for Evo/Lution Linux.
+# Written by Carl Duff for Evo/Lution Linux
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Some code has been used or adapted from the Arch Installation Script (AIS)
+# and Arch Ultimate Installer (AUI) written by helmuthdu, the Antergos 
+# CLI installer written by Alex Filgueira, and the Manjaro 0.8 installer
+# Written by Philip Muller.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# This program is free software, provided under the GNU General Public License
+# as published by the Free Software Foundation. So feel free to copy, distribute,
+# or modify it as you wish.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#-----------------------------------------------------------------------
 
-##
-## Set variables, colours, and prompts
-##
 
-# Menu and installation
-  checklist=( 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 )
-  KDE_INSTALLED=0
-  GNOME_INSTALLED=0
-  LXDE_INSTALLED=0
-  DM_INSTALLED=0
-  COMMON_INSTALLED=0
-  NM_INSTALLED=0
-  KEYMAP_XKB="us"
-  LTS=0
 
-# Architecture
-  ARCHI=`uname -m`
-  UEFI=0
-  LVM=0
-  LUKS=0
-  LUKS_DISK="sda2"
-  EFI_DISK="/boot/efi"
-  ROOT_DISK="/dev/sda1"
-  BOOT_DISK="/dev/sda"
+######################################################################
+##																	##
+##                   Installer Variables							##
+##																	##
+######################################################################
 
-# COLORS
-    Bold=$(tput bold)
-    Underline=$(tput sgr 0 1)
-    Reset=$(tput sgr0)
- 
-    Red=$(tput setaf 1)
-    Green=$(tput setaf 2)
-    Yellow=$(tput setaf 3)
-    Blue=$(tput setaf 4)
-    Purple=$(tput setaf 5)
-    Cyan=$(tput setaf 6)
-    White=$(tput setaf 7)
- 
-    BRed=${Bold}$(tput setaf 1)
-    BGreen=${Bold}$(tput setaf 2)
-    BYellow=${Bold}$(tput setaf 3)
-    BBlue=${Bold}$(tput setaf 4)
-    BPurple=${Bold}$(tput setaf 5)
-    BCyan=${Bold}$(tput setaf 6)
-    BWhite=${Bold}$(tput setaf 7)
+# Create a temporary file to store menu selections
+ANSWER="/tmp/.lution"
+
+# Save retyping
+VERSION="Lution-AIS 0.3"
+
+# Installation
+  KDE_INSTALLED=0      	# Has KDE been installed? Used for display manager option
+  GNOME_INSTALLED=0    	# Has Gnome been installed? Used for display manager option
+  LXDE_INSTALLED=0     	# Has LXDE been installed? Used for display manager option
+  DM_INSTALLED=0       	# Has a display manager been installed?
+  COMMON_INSTALLED=0   	# Has the common-packages option been taken?
+  NM_INSTALLED=0       	# Has a network connection manager been installed and enabled?
+  KEYMAP="us"          	# Virtual console keymap. Default is "us"
+  XKBMAP="us"      	    # X11 keyboard layout. Default is "us"
+  ZONE=""               # For time
+  SUBZONE=""            # For time
+  LOCALE="en_US.UTF-8"  # System locale. Default is "en_US.UTF-8"
+  LTS=0                	# Has the LTS Kernel been installed?
+  GRAPHIC_CARD=`hwinfo --gfxcard|grep 'Model:[[:space:]]'`  # Auto-detect popular graphics cards
+  GC_DETECTED=""        # Name of Graphics Card Detected
+  SHOW_ONCE=0           # Show de_wm information only once
+  TUITION_MODE=0        # Extra information for beginners
   
-# Prompts
-    prompt1="Enter your option: "
-    prompt2="Enter n° of options (ex: 1 2 3 or 1-3): "
-    prompt3="You have to manual enter the following commands, then press ${BYellow}ctrl+d${Reset} or type ${BYellow}exit${Reset}:"
+# Architecture
+  ARCHI=`uname -m`     	# Display whether 32 or 64 bit system
+  UEFI=0               	# Is the system UEFI?
+  SYSTEM="Unknown"     	# Display whether system is BIOS or UEFI. Default is "unknown"
+  ROOT_PART=""          # ROOT partition
+  UEFI_PART=""          # UEFI partition
+  INST_DEV=""           # Device where system has been installed
 
-# Current Directory
-  AUI_DIR=`pwd`
+# Installation
   MOUNTPOINT="/mnt"
 
-# Verbose mode
-  [[ $1 == -v || $1 == --verbose ]] && VERBOSE_MODE=1 || VERBOSE_MODE=0
 
-# Log file
-  LOG="${AUI_DIR}/`basename ${0}`_error.log"
-  [[ -f $LOG ]] && rm -f $LOG
-  PKG=""
-  PKG_FAIL="${AUI_DIR}/`basename ${0}`_pkg_fail_list.log"
-  [[ -f $PKG_FAIL ]] && rm -f $PKG_FAIL
+######################################################################
+##																	##
+##                        Core Functions							##
+##																	##
+######################################################################
 
 
-#
-# Set common functions
-#
+# Check user is root, and that there is an active internet connection
+# Seperated the checks into seperate "if" statements for readability.
+check_evo_requirements() {
+	
+  dialog --backtitle "$VERSION" --title " Checking Evo Requirements " --infobox "\nChecking installer has been run as root and that there is an active internet connection. Please wait..." 7 40
+  sleep 2
+  
+  if [[ `whoami` != "root" ]]; then
+     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Root Failure " --infobox "\nThe installer must be run as root. Exiting.\n" 6 30
+     sleep 2
+     exit 1
+  fi
+  
+  if [[ ! ` ping -c 1 google.com ` ]]; then
+     dialog --backtitle "$VERSION" --title " Connection Failure " --infobox "\nInternet connection test failed. Exiting.\n" 6 30
+     sleep 2
+     exit 1
+  else
+     dialog --backtitle "$VERSION" --title " Requirements Met " --infobox "\nAll checks passed! \n" 5 30
+     sleep 2   
+     clear
+     pacman -Syy
+  fi
 
- error_msg() { 
-    local MSG="${1}"
-    echo -e "${MSG}"
-    exit 1
- } 
+}
 
-  cecho() { #{{{
-    echo -e "$1"
-    echo -e "$1" >>"$LOG"
-    tput sgr0;
-  }
-
-  check_boot_system() {
+# Modified from the AIS check_boot_system function to identify if
+# system is made by Apple, and whether BIOS or UEFI is used.
+id_system() {
     if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]; then
       modprobe -r -q efivars || true  # if MAC
     else
       modprobe -q efivarfs            # all others
     fi
+    
     if [[ -d "/sys/firmware/efi/" ]]; then
       ## Mount efivarfs if it is not already mounted
       if [[ -z $(mount | grep /sys/firmware/efi/efivars) ]]; then
         mount -t efivarfs efivarfs /sys/firmware/efi/efivars
       fi
       UEFI=1
-      echo "UEFI Mode detected"
+      SYSTEM="UEFI System Detected"
     else
       UEFI=0
-      echo "BIOS Mode detected"
+      SYSTEM="BIOS System Detected"
     fi
-  }
+}
 
-  read_input() {
-      read -p "$prompt1" OPTION
-  }
-  
-  read_input_text() {
-      read -p "$1 [y/N]: " OPTION
-      echo ""
-    OPTION=`echo "$OPTION" | tr '[:upper:]' '[:lower:]'`
-  } 
-
- read_input_options() {
-    local line
-    local packages
-    if [[ $AUTOMATIC_MODE -eq 1 ]]; then
-      array=("$1")
-    else
-      read -p "$prompt2" OPTION
-      array=("$OPTION")
-    fi
-    for line in ${array[@]/,/ }; do
-      if [[ ${line/-/} != $line ]]; then
-        for ((i=${line%-*}; i<=${line#*-}; i++)); do
-          packages+=($i);
-        done
-      else
-        packages+=($line)
-      fi
-    done
-    OPTIONS=("${packages[@]}")
-  }
-
-  print_line() { 
-    printf "%$(tput cols)s\n"|tr ' ' '-'
-  }
-  print_title() {
-    clear
-    print_line
-    echo -e "# ${BBlue}$1${Reset}"
-    print_line
-    echo ""
-  }
-  
-  print_info() {
-    #Console width number
-    T_COLS=`tput cols`
-    echo -e "${Bold}$1${Reset}\n" | fold -sw $(( $T_COLS - 18 )) | sed 's/^/\t/'
-  }
- 
-   print_info_light() {
-    #Console width number
-    T_COLS=`tput cols`
-    echo -e "$1\n" | fold -sw $(( $T_COLS - 18 )) | sed 's/^/\t/'
-  }
- 
-  print_warning() {
-    T_COLS=`tput cols`
-    echo -e "${BYellow}$1${Reset}\n" | fold -sw $(( $T_COLS - 1 ))
-  }
-  
-  print_danger() {
-    T_COLS=`tput cols`
-    echo -e "${BRed}$1${Reset}\n" | fold -sw $(( $T_COLS - 1 ))
-  }
-
-  checkbox() {
-    #display [X] or [ ]
-    [[ "$1" -eq 1 ]] && echo -e "${BGreen}(${Reset}${Bold}#${BGreen})${Reset}" || echo -e "${BRed}( ${BRed})${Reset}";
-  }
-
-  contains_element() {
-    #check if an element exist in a string
-    for e in "${@:2}"; do [[ $e == $1 ]] && break; done;
-  }
-
- invalid_option() {
-    print_line
-    echo "Invalid option. Try another one."
-    pause_function
-  }
-  
-  pause_function() {
-    print_line
-      read -e -sn 1 -p "Press enter to continue..."
-  }
-
-  mainmenu_item() { #{{{
-    echo -e "$(checkbox "$1") ${Bold}$2${Reset}"
-  }
-
- arch_chroot() {
+# Taken from AIS. An excellent bit of code!
+arch_chroot() {
     arch-chroot $MOUNTPOINT /bin/bash -c "${1}"
-  }
- 
-  getkeymap_xkb() {
-    local keymaps_xkb=("af - Afghani" "al - Albanian" "et - Amharic" "ma - Arabic (Morocco)" "sy - Arabic (Syria)" "am - Armenian" "az - Azerbaijani" "ml - Bambara" "by - Belarusian" "be - Belgian" "bd - Bangla" "ba - Bosnian" "bg - Bulgarian" "mm - Burmese" "cn - Chinese" "hr - Croatian" "cz - Czech" "dk - Danish" "mv - Dhivehi" "nl - Dutch" "bt - Dzongkha" "cm - English (Cameroon)" "gh - English (Ghana)" "ng - English (Nigeria)" "za - English (South Africa)" "gb - English (UK)" "us - English (US)" "ee - Estonian" "fo - Faroese" "ph - Filipino" "fi - Finnish" "fr - French" "ca - French (Canada)" "cd - French (DR Congo)" "gn - French (Guinea)" "ge - Georgian" "de - German" "at - German (Austria)" "ch - German (Switzerland)" "gr - Greek" "il - Hebrew" "hu - Hungarian" "is - Icelandic" "in - Indian" "iq - Iraqi" "it - Italian" "ie - Irish" "jp - Japanese" "kz - Kazakh" "kh - Khmer (Cambodia)" "kr - Korean" "kg - Kyrgyz" "lv - Latvian" "la - Lao" "lt - Lithuanian" "mk - Macedonian" "mt - Maltese" "md - Moldavian" "mn - Mongolian" "me - Montenegrin" "np - Nepali" "no - Norwegian" "ir - Persian" "pl - Polish" "pt - Portuguese" "br - Portuguese (Brazil)" "ro - Romanian" "ru - Russian" "rs - Serbian" "si - Slovenian" "sk - Slovak" "es - Spanish" "se - Swedish" "tz - Swahili (Tanzania)" "ke - Swahili (Kenya)" "tw - Taiwanese" "tj - Tajik" "th - Thai" "bw - Tswana" "tr - Turkish" "tm - Turkmen" "ua - Ukrainian" "pk - Urdu (Pakistan)" "uz - Uzbek" "vn - Vietnamese" "sn - Wolof")
-    PS3="$prompt1"
-    echo "Select keymap:"
-    select KEYMAP_XKB in "${keymaps_xkb[@]}"; do
-      if contains_element "$KEYMAP_XKB" "${keymaps_xkb[@]}"; then
-        break
-      else
-        invalid_option
-      fi
-    done
-  }
+}  
 
-  getkeymap() { 
-    local keymaps=(`localectl list-keymaps`)
-    PS3="$prompt1"
-    echo "Select keymap:"
-    select KEYMAP in "${keymaps[@]}"; do
-      if contains_element "$KEYMAP" "${keymaps[@]}"; then
-        break
-      else
-        invalid_option
-      fi
-    done
-  }
+######################################################################
+##																	##
+##                 Configuration Functions							##
+##																	##
+######################################################################
 
- setlocale() {
-    local locale_list=(`cat /etc/locale.gen | grep UTF-8 | sed 's/\..*$//' | sed '/@/d' | awk '{print $1}' | uniq | sed 's/#//g'`);
-    PS3="$prompt1"
-    echo "Select locale:"
-    select LOCALE in "${locale_list[@]}"; do
-      if contains_element "$LOCALE" "${locale_list[@]}"; then
-        LOCALE_UTF8="${LOCALE}.UTF-8"
-        break
-      else
-        invalid_option
-      fi
-    done
-  }
+
+# Adapted from AIS. Added option to allow users to edit the mirrorlist.
+configure_mirrorlist() {
+
+# Generate a mirrorlist based on the country chosen.	
+mirror_by_country() {
+
+ COUNTRY_LIST=""
+ countries_list=("AU_Australia AT_Austria BY_Belarus BE_Belgium BR_Brazil BG_Bulgaria CA_Canada CL_Chile CN_China CO_Colombia CZ_Czech_Republic DK_Denmark EE_Estonia FI_Finland FR_France DE_Germany GR_Greece HU_Hungary IN_India IE_Ireland IL_Israel IT_Italy JP_Japan KZ_Kazakhstan KR_Korea LV_Latvia LU_Luxembourg MK_Macedonia NL_Netherlands NC_New_Caledonia NZ_New_Zealand NO_Norway PL_Poland PT_Portugal RO_Romania RU_Russia RS_Serbia SG_Singapore SK_Slovakia ZA_South_Africa ES_Spain LK_Sri_Lanka SE_Sweden CH_Switzerland TW_Taiwan TR_Turkey UA_Ukraine GB_United_Kingdom US_United_States UZ_Uzbekistan VN_Vietnam")
+
+ for i in ${countries_list}; do
+     COUNTRY_LIST="${COUNTRY_LIST} ${i} -"
+ done
+	
+ dialog --backtitle "$VERSION" --title " Select Country " --menu "\nA list of mirrors by the selected country will be generated.\n\nOnce reviewed, you can choose to use it or not." 20 45 16 ${COUNTRY_LIST} 2>${ANSWER} || prep_menu
+ COUNTRY_CODE=$(cat ${ANSWER} |sed 's/_.*//')
+
+ URL="https://www.archlinux.org/mirrorlist/?country=${COUNTRY_CODE}&use_mirror_status=on"
+ MIRROR_TEMP=$(mktemp --suffix=-mirrorlist)
+
+ # Get latest mirror list and save to tmpfile
+ dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Generating Mirrorlist " --infobox "\nGenerating a mirrorlist. Please wait... " 7 40
   
+ curl -so ${MIRROR_TEMP} ${URL}
+ sed -i 's/^#Server/Server/g' ${MIRROR_TEMP}
+ leafpad ${MIRROR_TEMP}
 
-  settimezone() {
-    local zone=(`timedatectl list-timezones | sed 's/\/.*$//' | uniq`);
-    PS3="$prompt1"
-    echo "Select zone:"
-    select ZONE in "${zone[@]}"; do
-      if contains_element "$ZONE" "${zone[@]}"; then
-        local subzone=(`timedatectl list-timezones | grep ${ZONE} | sed 's/^.*\///'`)
-        PS3="$prompt1"
-        echo "Select subzone:"
-        select SUBZONE in "${subzone[@]}"; do
-          if contains_element "$SUBZONE" "${subzone[@]}"; then
-            break
-          else
-            invalid_option
-          fi
-        done
-        break
-      else
-        invalid_option
-      fi
-    done
-  }
-
-check_evo_requirements() {
-
-  if  [[ `whoami` != "root" ]]; 
-  then
-    print_danger "This script must be run with root privilages (i.e. the 'sudo' command)."
-    pause_function
-    exit 1
-  fi
-
-  if ! [ "`ping -c 1 google.com`" ]; 
-  then
-    echo 
-    print_danger "Connection test failed. You must run this script with an active internet connection."
-    pause_function
-    exit 1
-  fi
+ dialog --yesno $"Use generated mirrorlist for installer?" 0 0 \
+ && mv -i -f /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.orig \
+ && mv -i -f ${MIRROR_TEMP} /etc/pacman.d/mirrorlist \
+ && chmod +r /etc/pacman.d/mirrorlist \
+ && dialog --msgbox "\nDone! Original Mirrorlist has been saved as:\n\n/etc/pacman.d/mirrorlist.orig" 10 40 || prep_menu
 }
 
+dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Mirrorlist " \
+    --menu $"\nThe mirrorlist contains server addresses used by pacman to install packages. They are accessed by pacman in the order listed.\n\n" 13 45 2 \
+	"1" $"Generate list by Country" \
+	"2" $"Manually edit mirrorlist" 2>${ANSWER}	
 
-# SELECT KEYMAP - SETXKBMAP
-# Modified by Carl Duff to use the 'setxkbmap' command rather than 'loadkeys' for the installer terminal.
-select_keymap_xkb(){
-  print_title "INSTALLER KEYBOARD LAYOUT"
-  print_info "The setxkbmap command defines the keyboard keymap to be used in this terminal. It will also be used to set the keyboard layout for your installed desktop environment(s) / window manager(s), where installed."
-  pause_function
-  OPTION=n
-  while [[ $OPTION != y ]]; do
-    getkeymap_xkb
-    read_input_text "Confirm keymap: $KEYMAP_XKB"
-  done
-  setxkbmap ${KEYMAP_XKB:0:2}
+    case $(cat ${ANSWER}) in
+        "1") mirror_by_country
+             ;;
+        "2") gksu leafpad /etc/pacman.d/mirrorlist
+             ;;
+          *) prep_menu
+             ;;
+    esac  	
+
 }
 
-#}}}
-#MIRRORLIST {{{
-configure_mirrorlist(){
-  local countries_code=("AU" "AT" "BY" "BE" "BR" "BG" "CA" "CL" "CN" "CO" "CZ" "DK" "EE" "FI" "FR" "DE" "GR" "HU" "IN" "IE" "IL" "IT" "JP" "KZ" "KR" "LV" "LU" "MK" "NL" "NC" "NZ" "NO" "PL" "PT" "RO" "RU" "RS" "SG" "SK" "ZA" "ES" "LK" "SE" "CH" "TW" "TR" "UA" "GB" "US" "UZ" "VN")
-  local countries_name=("Australia" "Austria" "Belarus" "Belgium" "Brazil" "Bulgaria" "Canada" "Chile" "China" "Colombia" "Czech Republic" "Denmark" "Estonia" "Finland" "France" "Germany" "Greece" "Hungary" "India" "Ireland" "Israel" "Italy" "Japan" "Kazakhstan" "Korea" "Latvia" "Luxembourg" "Macedonia" "Netherlands" "New Caledonia" "New Zealand" "Norway" "Poland" "Portugal" "Romania" "Russian" "Serbia" "Singapore" "Slovakia" "South Africa" "Spain" "Sri Lanka" "Sweden" "Switzerland" "Taiwan" "Turkey" "Ukraine" "United Kingdom" "United States" "Uzbekistan" "Viet Nam")
-  country_list(){
-    #`reflector --list-countries | sed 's/[0-9]//g' | sed 's/^/"/g' | sed 's/,.*//g' | sed 's/ *$//g'  | sed 's/$/"/g' | sed -e :a -e '$!N; s/\n/ /; ta'`
-    PS3="$prompt1"
-    echo "Select your country:"
-    select country_name in "${countries_name[@]}"; do
-      if contains_element "$country_name" "${countries_name[@]}"; then
-        contry_code=${countries_code[$(( $REPLY - 1 ))]}
-        break
-      else
-        invalid_option
-      fi
+# Simplified from the Arch --> Cinnarch/Antergos --> Manjaro installer code.
+set_keymap() { 
+	
+	KEYMAPS=""
+    for i in $(find /usr/share/kbd/keymaps -follow -name "*.gz" | sed 's|^.*/||g' | sed 's/.map.*//' | sort); do
+        KEYMAPS="${KEYMAPS} ${i} -"
     done
+    
+    dialog --backtitle "$VERSION" --title " Select Keymap " \
+    --menu "\nUse the [pg up] and [pg dwn] keys for navigation, or press the first letter of the keymap if known." 20 40 16 ${KEYMAPS} 2>${ANSWER} || config_base_menu
+    KEYMAP=$(cat ${ANSWER})
+    echo "KEYMAP=$KEYMAP" > ${MOUNTPOINT}/etc/vconsole.conf
   }
-  print_title "CONFIGURE MIRRORLIST"
-  print_info "This option can list the mirrors/servers available in your country, ranked by download speed."
-  OPTION=n
-  while [[ $OPTION != y ]]; do
-    country_list
-    read_input_text "Confirm country: $country_name"
+
+# Set keymap for X11
+ set_xkbmap() {
+	 
+	XKBMAP_LIST=""
+	keymaps_xkb=("af_Afghani al_Albanian am_Armenian ara_Arabic at_German-Austria az_Azerbaijani ba_Bosnian bd_Bangla be_Belgian bg_Bulgarian br_Portuguese-Brazil bt_Dzongkha bw_Tswana by_Belarusian ca_French-Canada cd_French-DR-Congo ch_German-Switzerland cm_English-Cameroon cn_Chinese cz_Czech de_German dk_Danishee_Estonian epo_Esperanto es_Spanish et_Amharic fo_Faroese fi_Finnish fr_French gb_English-UK ge_Georgian gh_English-Ghana gn_French-Guinea gr_Greek hr_Croatian hu_Hungarian ie_Irish il_Hebrew iq_Iraqi ir_Persian is_Icelandic it_Italian jp_Japanese ke_Swahili-Kenya kg_Kyrgyz kh_Khmer-Cambodia kr_Korean kz_Kazakh la_Lao latam_Spanish-Lat-American lk_Sinhala-phonetic lt_Lithuanian lv_Latvian ma_Arabic-Morocco mao_Maori md_Moldavian me_Montenegrin mk_Macedonian ml_Bambara mm_Burmese mn_Mongolian mt_Maltese mv_Dhivehi ng_English-Nigeria nl_Dutch no_Norwegian np_Nepali ph_Filipino pk_Urdu-Pakistan pl_Polish pt_Portuguese ro_Romanian rs_Serbian ru_Russian se_Swedish si_Slovenian sk_Slovak sn_Wolof sy_Arabic-Syria th_Thai tj_Tajik tm_Turkmen tr_Turkish tw_Taiwanese tz_Swahili-Tanzania ua_Ukrainian us_English-US uz_Uzbek vn_Vietnamese za_English-S-Africa")
+    
+	for i in ${keymaps_xkb}; do
+        XKBMAP_LIST="${XKBMAP_LIST} ${i} -"
+    done
+	
+    dialog --backtitle "$VERSION" --title " Select xkbmap " --menu "Select Keyboard Layout" 20 45 16 ${XKBMAP_LIST} 2>${ANSWER} || prep_menu
+    XKBMAP=$(cat ${ANSWER} |sed 's/_.*//')
+    setxkbmap $XKBMAP
+ 
+}
+
+# locale array generation code taken from the Manjaro 0.8 installer
+set_locale() {
+	
+  LOCALES=""	
+  for i in $(cat /etc/locale.gen | grep -v "#  " | sed 's/#//g' | sed 's/ UTF-8//g' | grep .UTF-8); do
+      LOCALES="${LOCALES} ${i} -"
   done
 
-  url="https://www.archlinux.org/mirrorlist/?country=${contry_code}&use_mirror_status=on"
+  dialog --backtitle "$VERSION" --title " Select locale " --menu "Select A Locale" 22 30 16 ${LOCALES} 2>${ANSWER} || config_base_menu 
+  LOCALE=$(cat ${ANSWER})
+  
+  echo 'LANG="'$LOCALE'"' > ${MOUNTPOINT}/etc/locale.conf  
+  arch_chroot "sed -i '/'${LOCALE}'/s/^#//' /etc/locale.gen"
+  arch_chroot "locale-gen"
+}
 
-  tmpfile=$(mktemp --suffix=-mirrorlist)
+# Zone and sub-zone array generation code taken from the Manjaro 0.8 Installer
+set_timezone() {
 
-  # Get latest mirror list and save to tmpfile
-  curl -so ${tmpfile} ${url}
-  sed -i 's/^#Server/Server/g' ${tmpfile}
+    ZONE=""
+    for i in $(grep '^[A-Z]' /usr/share/zoneinfo/zone.tab | cut -f 3 | sed -e 's#/.*##g'| sort -u); do
+      ZONE="$ZONE ${i} -"
+    done
+    
+     dialog --backtitle "$VERSION" --title " Select Time Zone " --menu "\n." 20 40 12 ${ZONE} 2>${ANSWER} || config_base_menu
+     ZONE=$(cat ${ANSWER}) 
+    
+     SUBZONE=""
+     for i in $(grep '^[A-Z]' /usr/share/zoneinfo/zone.tab | grep $ZONE/ | cut -f 3 | sed -e "s#$ZONE/##g"| sort -u); do
+        SUBZONE="$SUBZONE ${i} -"
+     done
+         
+     dialog --backtitle "$VERSION" --title " Select Time Sub-Zone " --menu "\n." 20 40 12 ${SUBZONE} 2>${ANSWER} || config_base_menu
+     SUBZONE=$(cat ${ANSWER}) 
+    
+     dialog --yesno $"Set Time Zone as ${ZONE}/${SUBZONE} ?" 0 0 && arch_chroot "ln -s /usr/share/zoneinfo/${ZONE}/${SUBZONE} /etc/localtime" || config_base_menu
+    
+}
 
-  # Backup and replace current mirrorlist file (if new file is non-zero)
-  if [[ -s ${tmpfile} ]]; then
-   { echo " Backing up the original mirrorlist..."
-     mv -i /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.orig; } &&
-   { echo " Rotating the new list into place..."
-     mv -i ${tmpfile} /etc/pacman.d/mirrorlist; }
+set_hw_clock() {
+	
+   dialog --backtitle "$VERSION" --title " Set Hardware Clock " \
+    --menu $"" 9 50 3 \
+ 	"1" $"UTC" \
+	"2" $"Local Time" 2>${ANSWER}	
+
+    case $(cat ${ANSWER}) in
+        "1") arch_chroot "hwclock --systohc --utc" 
+             ;;
+        "2") arch_chroot "hwclock --systohc --localtime"
+             ;;
+          *) config_base_menu
+             ;;
+     esac	
+}
+
+# Adapted from AIS. As with some other functions, decided that keeping the numbering for options
+# was worth repeating portions of code.
+generate_fstab() {
+
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Generate FSTAB " \
+    --menu "\nThe FSTAB file (File System TABle) sets what storage devices and partitions are to be mounted, and how they are to be used.\n\nUUID/PARTUUID (Universally Unique IDentifier) is recommended.\n\nIf no labels were set for the partitions earlier, device names will be used for the label option." 19 60 3 \
+	"1" $"Dev (partition code)" \
+	"2" $"Label (user defined)" \
+	"3" $"UUID/PARTUUID (unique code)" 2>${ANSWER}
+
+    case $(cat ${ANSWER}) in
+        "1") genfstab -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
+             ;;
+        "2") genfstab -L -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
+             ;;
+        "3") if [[ $UEFI -eq 1 ]]; then
+                genfstab -t PARTUUID -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
+             else 
+                genfstab -U -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
+             fi
+             ;;
+          *) config_base_menu
+             ;;
+    esac
+
+    gksu leafpad ${MOUNTPOINT}/etc/fstab
+}
+
+# Adapted from AIS.
+set_hostname() {
+
+   dialog --backtitle "$VERSION" --title " Configure Host Name " --inputbox "\nThe host name is used to identify the system on a network.\n\nIt is restricted to alphanumeric characters, can contain a hyphen (-) - but not at the start or end - and must be no longer than 63 characters.\n" 12 65 "evo" 2>${ANSWER} || config_base_menu
+   HOST_NAME=$(cat ${ANSWER})
+
+   echo "$HOST_NAME" > ${MOUNTPOINT}/etc/hostname
+   arch_chroot "sed -i '/127.0.0.1/s/$/ '${HOST_NAME}'/' /etc/hosts"
+   arch_chroot "sed -i '/::1/s/$/ '${HOST_NAME}'/' /etc/hosts"
+}
+
+# Adapted and simplified from the Manjaro 0.8 and Antergos 2.0 installers
+set_root_password() {
+
+
+    dialog --title " Set Root Password " --clear --insecure --passwordbox "\nEnter Root password\n\n" 10 55 2> ${ANSWER}
+    PASSWD=$(cat ${ANSWER})
+    
+    dialog --title " Set Root Password " --clear --insecure --passwordbox "\nRe-enter Root password\n\n" 10 55 2> ${ANSWER}
+    PASSWD2=$(cat ${ANSWER})
+    
+    if [[ $PASSWD == $PASSWD2 ]]; then 
+       echo -e "${PASSWD}\n${PASSWD}" > /tmp/.passwd
+       arch_chroot "passwd root" < /tmp/.passwd
+       rm /tmp/.passwd
+    else
+       dialog --backtitle "$VERSION" --title " Root Password Error " --msgbox $"\nThe Root passwords entered do not match. Please try again.\n" 8 35
+       set_root_password
+    fi
+
+}
+
+# Adapted and simplified from the Antergos 2.0 installer
+create_new_user() {
+
+        dialog --backtitle "$VERSION" --title " Create New User " --inputbox "\nEnter the user name.\n\nIt is recommended to use all lower-case letters.\n" 11 55 "" 2>${ANSWER} || config_base_menu
+        USER=$(cat ${ANSWER})
+        
+        if [[ $USER == "" ]]; then
+           dialog --backtitle "$VERSION" --title " User Name Error " --msgbox $"\nNo user name was entered. Please try again.\n" 8 35
+           create_new_user
+        else
+           dialog --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 10 55 2> ${ANSWER}
+           PASSWD=$(cat ${ANSWER}) 
+    
+           dialog --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 10 55 2> ${ANSWER}
+           PASSWD2=$(cat ${ANSWER}) 
+    
+           if [[ $PASSWD == $PASSWD2 ]]; then         
+              dialog --backtitle "$VERSION" --title " Setting User " --infobox "\nCreating User and setting groups...\n" 6 40
+              sleep 2
+              arch_chroot "useradd ${USER} -m -g users -G wheel,storage,power,network,video,audio,lp -s /bin/bash"
+              echo -e "${PASSWD}\n${PASSWD}" > /tmp/.passwd
+              arch_chroot "passwd ${USER}" < /tmp/.passwd
+              rm /tmp/.passwd
+             # arch_chroot "cp /etc/skel/.bashrc /home/${USER}"
+             # arch_chroot "chown -R ${USER}:users /home/${USER}"
+              arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
+           else
+              dialog --backtitle "$VERSION" --title " User Password Error " --msgbox $"\nThe User passwords entered do not match. Please try again.\n" 8 35
+              create_new_user
+           fi
+         fi
+}
+
+run_mkinitcpio() {
+	
+  clear
+  if [[ $LTS -eq 1 ]]; then
+     arch_chroot "mkinitcpio -p linux-lts"
   else
-    echo " Unable to update, could not download list."
+     arch_chroot "mkinitcpio -p linux"
   fi
-  # allow global read access (required for non-root yaourt execution)
-  chmod +r /etc/pacman.d/mirrorlist
-  gksu leafpad /etc/pacman.d/mirrorlist
+
 }
-#}}}
-#UMOUNT PARTITIONS {{{
+
+######################################################################
+##																	##
+##            System and Partitioning Functions						##
+##																	##
+######################################################################
+
+
+
+# Unmount partitions (AIS)
 umount_partitions(){
   mounted_partitions=(`lsblk | grep ${MOUNTPOINT} | awk '{print $7}' | sort -r`)
   swapoff -a
@@ -367,1271 +380,927 @@ umount_partitions(){
     umount $i
   done
 }
-#}}}
-#CREATE PARTITION SCHEME {{{
-create_partition_scheme(){
-  LUKS=0
-  LVM=0
-  select_device(){
-    devices_list=(`lsblk -d | awk '{print "/dev/" $1}' | grep 'sd\|hd\|vd'`);
-    PS3="$prompt1"
-    echo -e "Select partition:\n"
-    select device in "${devices_list[@]}"; do
-      if contains_element "${device}" "${devices_list[@]}"; then
-        break
-      else
-        invalid_option
-      fi
-    done
-    BOOT_DISK=$device
-  }
-  print_title "PARTITION DISK"
-  print_info "Partitioning logically divides a hard drive into seperate sections (e.g. boot, root, home, and swap)."
-  print_info "Although partitioning is generally up to the user, UEFI systems MUST have a separate boot partition using filesystem FAT32."
-  partition_layout=("Standard" "Plus LVM" "Plus Encryption and LVM")
-  PS3="$prompt1"
-  echo -e "Select partition scheme:"
-  select OPT in "${partition_layout[@]}"; do
-    case "$REPLY" in
-      1)
-        create_partition
-        ;;
-      2)
-        create_partition
-        setup_lvm
-        ;;
-      3)
-        create_partition
-        setup_luks
-        setup_lvm
-        ;;
-      *)
-        invalid_option
-        ;;
-    esac
-    [[ -n $OPT ]] && break
-  done
-}
-#}}}
-#SETUP PARTITION{{{
-# Modified by Carl Duff. Integrated Gparted, and dropped most of the other partitioning tools.
-create_partition(){
-  print_title "CHOOSE PARTITIONING TOOL"
-  print_info "GParted is a user-friendly graphical tool that supports both BIOS and UEFI systems."
-  print_info "Text-based tools available are cfdisk for BIOS systems (MBR), or gdisk for UEFI systems (GPT)."
-  print_warning "It is not necessary to actually format the partitions created, as this will be undertaken later."
-  apps_list=("gparted" "cfdisk" "gdisk");
-  PS3="$prompt1"
-  echo -e "Select partition program:"
-  select OPT in "${apps_list[@]}"; do
-    if contains_element "$OPT" "${apps_list[@]}"; then
-      select_device
-      case $OPT in
-        gparted)
-          gksu gparted ${device}
-          ;;
-        *)
-          $OPT ${device}
-          ;;
-      esac
-      break
+
+# Adapted from AIS
+confirm_mount() {
+    if mount | grep $1; then
+      dialog --backtitle "$VERSION" --title " Mount Status " --infobox "\nMount Successful!\n" 5 30
+      sleep 2
+      PARTITIONS="$(echo $PARTITIONS | sed s/${PARTITION}$' -'//)"
+      NUMBER_PARTITIONS=$(( NUMBER_PARTITIONS - 1 ))
     else
-      invalid_option
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Mount Status " --infobox "Mount Failed!" 5 30
+      sleep 2
+      config_base_menu
     fi
-  done
-}
-#}}}
-#SETUP LUKS {{{
-setup_luks(){
-  print_title "SET UP ENCRYPTION"
-  print_info "The Linux Unified Key Setup or LUKS is a disk-encryption specification created by Clemens Fruhwirth and originally intended for Linux."
-  print_danger "\tDo not use this for boot partitions"
-  block_list=(`lsblk | grep 'part' | awk '{print "/dev/" substr($1,3)}'`)
-  PS3="$prompt1"
-  echo -e "Select partition:"
-  select OPT in "${block_list[@]}"; do
-    if contains_element "$OPT" "${block_list[@]}"; then
-      cryptsetup luksFormat $OPT
-      cryptsetup open --type luks $OPT crypt
-      LUKS=1
-      LUKS_DISK=`echo ${OPT} | sed 's/\/dev\///'`
-      break
-    elif [[ $OPT == "Cancel" ]]; then
-      break
-    else
-      invalid_option
-    fi
-  done
-}
-#}}}
-#SETUP LVM {{{
-setup_lvm(){
-  print_title "SET UP LOGICAL VOLUME MANAGEMENT (LVM)"
-  print_info "LVM is a logical volume manager for the Linux kernel; it manages disk drives and similar mass-storage devices. "
-  print_warning "Last partition will take 100% of free space left"
-  if [[ $LUKS -eq 1 ]]; then
-    pvcreate /dev/mapper/crypt
-    vgcreate lvm /dev/mapper/crypt
-  else
-    block_list=(`lsblk | grep 'part' | awk '{print "/dev/" substr($1,3)}'`)
-    PS3="$prompt1"
-    echo -e "Select partition:"
-    select OPT in "${block_list[@]}"; do
-      if contains_element "$OPT" "${block_list[@]}"; then
-        pvcreate $OPT
-        vgcreate lvm $OPT
-        break
-      else
-        invalid_option
-      fi
-    done
-  fi
-  read -p "Enter number of partitions [ex: 2]: " number_partitions
-  i=1
-  while [[ $i -le $number_partitions ]]; do
-    read -p "Enter $iª partition name [ex: home]: " partition_name
-    if [[ $i -eq $number_partitions ]]; then
-      lvcreate -l 100%FREE lvm -n ${partition_name}
-    else
-      read -p "Enter $iª partition size [ex: 25G, 200M]: " partition_size
-      lvcreate -L ${partition_size} lvm -n ${partition_name}
-    fi
-    i=$(( i + 1 ))
-  done
-  LVM=1
-}
-#}}}
-#SELECT|FORMAT PARTITIONS {{{
-format_partitions(){
-  print_title "FORMAT PARTITION(S)"
-  print_info "This step will select and format the selected partiton(s) where Arch will be installed"
-  print_danger "\tAll data on the ROOT and SWAP partition will be LOST."
-  i=0
-
-  block_list=(`lsblk | grep 'part\|lvm' | awk '{print substr($1,3)}'`)
-
-  # check if there is no partition
-  if [[ ${#block_list[@]} -eq 0 ]]; then
-    print_danger "No partition found! Please re-check your partitions."
-    pause_function
-    create_partition
-  fi
-
-  partitions_list=()
-  for OPT in ${block_list[@]}; do
-    check_lvm=`echo $OPT | grep lvm`
-    if [[ -z $check_lvm ]]; then
-      partitions_list+=("/dev/$OPT")
-    else
-      partitions_list+=("/dev/mapper/$OPT")
-    fi
-  done
-
-  # partitions based on boot system
-  if [[ $UEFI -eq 1 ]]; then
-    partition_name=("root" "EFI" "swap" "another")
-  else
-    partition_name=("root" "swap" "another")
-  fi
-
-  select_filesystem(){
-    filesystems_list=( "btrfs" "ext2" "ext3" "ext4" "f2fs" "jfs" "nilfs2" "ntfs" "vfat" "xfs");
-    PS3="$prompt1"
-    echo -e "Select filesystem:\n"
-    select filesystem in "${filesystems_list[@]}"; do
-      if contains_element "${filesystem}" "${filesystems_list[@]}"; then
-        break
-      else
-        invalid_option
-      fi
-    done
-  }
-
-  disable_partition(){
-    #remove the selected partition from list
-    unset partitions_list[${partition_number}]
-    partitions_list=(${partitions_list[@]})
-    #increase i
-    [[ ${partition_name[i]} != another ]] && i=$(( i + 1 ))
-  }
-
-  format_partition(){
-    read_input_text "Confirm format $1 partition"
-    if [[ $OPTION == y ]]; then
-      [[ -z $3 ]] && select_filesystem || filesystem=$3
-      mkfs.${filesystem} $1 \
-        $([[ ${filesystem} == xfs || ${filesystem} == btrfs ]] && echo "-f") \
-        $([[ ${filesystem} == vfat ]] && echo "-F32")
-      fsck $1
-      mkdir -p $2
-      mount -t ${filesystem} $1 $2
-      disable_partition
-    fi
-  }
-
-  format_swap_partition(){
-    read_input_text "Confirm format $1 partition"
-    if [[ $OPTION == y ]]; then
-      mkswap $1
-      swapon $1
-      disable_partition
-    fi
-  }
-
-  create_swap(){
-    swap_options=("partition" "file" "skip");
-    PS3="$prompt1"
-    echo -e "Select ${BYellow}${partition_name[i]}${Reset} filesystem:\n"
-    select OPT in "${swap_options[@]}"; do
-      case "$REPLY" in
-        1)
-          select partition in "${partitions_list[@]}"; do
-            #get the selected number - 1
-            partition_number=$(( $REPLY - 1 ))
-            if contains_element "${partition}" "${partitions_list[@]}"; then
-              format_swap_partition "${partition}"
-            fi
-            break
-          done
-          break
-          ;;
-        2)
-          total_memory=`grep MemTotal /proc/meminfo | awk '{print $2/1024}' | sed 's/\..*//'`
-          fallocate -l ${total_memory}M ${MOUNTPOINT}/swapfile
-          chmod 600 ${MOUNTPOINT}/swapfile
-          mkswap ${MOUNTPOINT}/swapfile
-          swapon ${MOUNTPOINT}/swapfile
-          i=$(( i + 1 ))
-          break
-          ;;
-        3)
-          i=$(( i + 1 ))
-          break
-          ;;
-        *)
-          invalid_option
-          ;;
-      esac
-    done
-  }
-
-  check_mountpoint(){
-    if mount | grep $2; then
-      echo "Successfully mounted"
-      disable_partition "$1"
-    else
-      echo "WARNING: Not Successfully mounted"
-    fi
-  }
-
-  set_efi_partition(){
-    efi_options=("/boot/efi" "/boot")
-    PS3="$prompt1"
-    echo -e "Select EFI mountpoint:\n"
-    select EFI_DISK in "${efi_options[@]}"; do
-      if contains_element "${EFI_DISK}" "${efi_options[@]}"; then
-        break
-      else
-        invalid_option
-      fi
-    done
-  }
-
-  while true; do
-    PS3="$prompt1"
-    if [[ ${partition_name[i]} == swap ]]; then
-      create_swap
-    else
-      echo -e "Select ${BYellow}${partition_name[i]}${Reset} partition:\n"
-      select partition in "${partitions_list[@]}"; do
-        #get the selected number - 1
-        partition_number=$(( $REPLY - 1 ))
-        if contains_element "${partition}" "${partitions_list[@]}"; then
-          case ${partition_name[i]} in
-            root)
-              ROOT_PART=`echo ${partition} | sed 's/\/dev\/mapper\///' | sed 's/\/dev\///'`
-              ROOT_DISK=${partition}
-              format_partition "${partition}" "${MOUNTPOINT}"
-              ;;
-            EFI)
-              set_efi_partition
-              read_input_text "Format ${partition} partition"
-              if [[ $OPTION == y ]]; then
-                format_partition "${partition}" "${MOUNTPOINT}${EFI_DISK}" vfat
-              else
-                mkdir -p "${MOUNTPOINT}${EFI_DISK}"
-                mount -t vfat "${partition}" "${MOUNTPOINT}${EFI_DISK}"
-                check_mountpoint "${partition}" "${MOUNTPOINT}${EFI_DISK}"
-              fi
-              ;;
-            another)
-              read -p "Mountpoint [ex: /home]:" directory
-              [[ $directory == "/boot" ]] && BOOT_DISK=`echo ${partition} | sed 's/[0-9]//'`
-              select_filesystem
-              read_input_text "Format ${partition} partition"
-              if [[ $OPTION == y ]]; then
-                format_partition "${partition}" "${MOUNTPOINT}${directory}" "${filesystem}"
-              else
-                read_input_text "Confirm fs="${filesystem}" part="${partition}" dir="${directory}""
-                if [[ $OPTION == y ]]; then
-                  mkdir -p ${MOUNTPOINT}${directory}
-                  mount -t ${filesystem} ${partition} ${MOUNTPOINT}${directory}
-                  check_mountpoint "${partition}" "${MOUNTPOINT}${directory}"
-                fi
-              fi
-              ;;
-          esac
-          break
-        else
-          invalid_option
-        fi
-      done
-    fi
-    #check if there is no partitions left
-    if [[ ${#partitions_list[@]} -eq 0 && ${partition_name[i]} != swap ]]; then
-      break
-    elif [[ ${partition_name[i]} == another ]]; then
-      read_input_text "Configure more partitions"
-      [[ $OPTION != y ]] && break
-    fi
-  done
-  pause_function
 }
 
-#INSTALL BASE SYSTEM
-# Written by Carl Duff.
-install_base_system(){
-  print_title "INSTALL BASE SYSTEM"
-  print_info "Where a wireless device has been detected, packages to support it will be installed automatically."
-  print_info "The latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer."
-  print_info "Whatever the kernel choice, the other can easily be added to an installed system to have both."
-  print_info "The base-devel package group is needed where intending to use the Arch User Repository (AUR)."
-  echo
-  
-  if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
-     print_warning "If installing the LTS Kernel in VirtualBox, the necessary modules must be manually loaded using a terminal AFTER booting the installed system. This need only be done ONCE:"
-     echo " $ su"
-     echo " # depmod -a"
-     echo " # modprobe -a vboxvideo vboxguest vboxsf"
-     echo " # reboot" 
-  fi
- 
-  echo
-  echo
-  echo "${BCyan}Kernel and base-devel selection${Reset}"
-  echo "1) Latest Kernel"
-  echo "2) Latest Kernel + base-devel"
-  echo "3) Long Term Support (LTS) Kernel"
-  echo "4) Long Term Support (LTS) Kernel + base-devel"
-  echo
-  read_input $BASEOPT
-  
-  case "$OPTION" in
-    1) # Latest Kernel
-       pacstrap ${MOUNTPOINT} base btrfs-progs ntp sudo
-    ;;
-    2) # Latest Kernel and base-devel
-       pacstrap ${MOUNTPOINT} base base-devel btrfs-progs ntp sudo
-    ;;
-    3) # LTS Kernel
-       pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs btrfs-progs ntp sudo
-       LTS=1
-    ;;
-    4) # LTS Kernel and base-devel
-       pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs base-devel btrfs-progs ntp sudo
-       LTS=1
-    ;;
-    *) invalid_option
-       install_base_system
-    ;;
-  esac
-}
-#}}}
-
-#}}}
-#CONFIGURE FSTAB {{{
-configure_fstab(){
-  print_title "CONFIGURE FSTAB"
-  print_info "The /etc/fstab (File System TABle) file determines what storage devices and partitions are to be mounted, and how they are to be used."
-  echo
-  if [[ ! -f ${MOUNTPOINT}/etc/fstab.aui ]]; then
-    cp ${MOUNTPOINT}/etc/fstab ${MOUNTPOINT}/etc/fstab.aui
-  else
-    cp ${MOUNTPOINT}/etc/fstab.aui ${MOUNTPOINT}/etc/fstab
-  fi
-  if [[ $UEFI -eq 1 ]]; then
-    fstab_list=("DEV" "PARTUUID" "LABEL");
-  else
-    fstab_list=("DEV" "UUID" "LABEL");
-  fi
-
-  PS3="$prompt1"
-  echo -e "Configure fstab based on:"
-  select OPT in "${fstab_list[@]}"; do
-    case "$REPLY" in
-      1) genfstab -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab ;;
-      2) if [[ $UEFI -eq 1 ]]; then
-          genfstab -t PARTUUID -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
-         else
-          genfstab -U -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab
-         fi
-         ;;
-      3) genfstab -L -p ${MOUNTPOINT} >> ${MOUNTPOINT}/etc/fstab ;;
-      *) invalid_option ;;
-    esac
-    [[ -n $OPT ]] && break
-  done
-  echo "Review your fstab"
-  [[ -f ${MOUNTPOINT}/swapfile ]] && sed -i "s/\\${MOUNTPOINT}//" ${MOUNTPOINT}/etc/fstab
-  pause_function
-  gksu leafpad ${MOUNTPOINT}/etc/fstab
-}
-#}}}
-#CONFIGURE HOSTNAME {{{
-configure_hostname(){
-  print_title "CONFIGURE HOSTNAME"
-  print_info "A host name is a unique name created to identify a machine on a network. Host names are restricted to alphanumeric characters.\nThe hyphen (-) can be used, but a host name cannot start or end with it. Length is restricted to 63 characters."
-  echo
-  read -p "Hostname (e.g.: arch): " host_name
-  echo "$host_name" > ${MOUNTPOINT}/etc/hostname
-  if [[ ! -f ${MOUNTPOINT}/etc/hosts.aui ]]; then
-    cp ${MOUNTPOINT}/etc/hosts ${MOUNTPOINT}/etc/hosts.aui
-  else
-    cp ${MOUNTPOINT}/etc/hosts.aui ${MOUNTPOINT}/etc/hosts
-  fi
-  arch_chroot "sed -i '/127.0.0.1/s/$/ '${host_name}'/' /etc/hosts"
-  arch_chroot "sed -i '/::1/s/$/ '${host_name}'/' /etc/hosts"
-}
-#}}}
-#CONFIGURE TIMEZONE {{{
-configure_timezone(){
-  print_title "CONFIGURE TIMEZONE"
-  print_info "In an operating system the time (clock) is determined by four parts: Time value, Time standard, Time Zone, and DST (Daylight Saving Time if applicable)."
-  OPTION=n
-  while [[ $OPTION != y ]]; do
-    settimezone
-    read_input_text "Confirm timezone (${ZONE}/${SUBZONE})"
-  done
-  arch_chroot "ln -s /usr/share/zoneinfo/${ZONE}/${SUBZONE} /etc/localtime"
-}
-#}}}
-#CONFIGURE HARDWARECLOCK {{{
-configure_hardwareclock(){
-  print_title "CONFIGURE HARDWARE CLOCK"
-  print_info "Unless you are installing alongside windows, pick UTC (Coordinated Universal Time), a global time standard."
-  echo
-  hwclock_list=('UTC' 'Localtime');
-  PS3="$prompt1"
-  select OPT in "${hwclock_list[@]}"; do
-    case "$REPLY" in
-      1) arch_chroot "hwclock --systohc --utc";
-        ;;
-      2) arch_chroot "hwclock --systohc --localtime";
-        ;;
-      *) invalid_option ;;
-    esac
-    [[ -n $OPT ]] && break
-  done
-}
-#}}}
-
-# CONFIGURE KEYMAP - INSTALLED SYSTEM
-# Modified by Carl DUff from the select_keymap function to configure the installed system.
-configure_keymap(){
-  print_title "CONFIGURE KEYMAP"
-  print_info "The /etc/vconsole.conf file determines the keyboard layout in the installed system's virtual console. It is not used for desktop environments."
-  echo
-  pause_function
-  OPTION=n
-  while [[ $OPTION != y ]]; do
-    getkeymap
-    read_input_text "Confirm keymap: $KEYMAP"
-  done
-  echo "KEYMAP=$KEYMAP" > ${MOUNTPOINT}/etc/vconsole.conf
-}
-
-#CONFIGURE LOCALE - INSTALLED SYSTEM
-configure_locale(){
-  print_title "CONFIGURE LOCALE"
-  print_info "Locales define the system language used. They are codes starting with two lower-case letters followed by two upper-case letters."
-  print_info "The lower-case letters determine the language, and the upper-case letters determine the country. For example 'en_GB' means english, GREAT BRITAIN."
-  pause_function
-  OPTION=n
-  while [[ $OPTION != y ]]; do
-    setlocale
-    read_input_text "Confirm locale ($LOCALE)"
-  done
-  echo 'LANG="'$LOCALE_UTF8'"' > ${MOUNTPOINT}/etc/locale.conf
-  arch_chroot "sed -i '/'${LOCALE_UTF8}'/s/^#//' /etc/locale.gen"
-  arch_chroot "locale-gen"
-}
-
-#CONFIGURE MKINITCPIO - INSTALLED SYSTEM
-# Amended by Carl Duff. Incorporates LTS kernel option.
-configure_mkinitcpio(){
-  print_title "CONFIGURE MKINITCPIO"
-  print_info "mkinitcpio is a Bash script used to create an initial ramdisk environment to load kernel modules."
-  [[ $LUKS -eq 1 ]] && sed -i '/^HOOK/s/block/block keymap encrypt/' ${MOUNTPOINT}/etc/mkinitcpio.conf
-  [[ $LVM -eq 1 ]] && sed -i '/^HOOK/s/filesystems/lvm2 filesystems/' ${MOUNTPOINT}/etc/mkinitcpio.conf
-  
-  # Determine if the LTS kernel installed or not, and run the appropriate mkinitcpio command
-  if [[ $LTS -eq 1 ]]; then
-     arch_chroot "mkinitcpio -p linux-lts"
-  else
-     arch_chroot "mkinitcpio -p linux"
-  fi
-}
-
-#INSTALL BOOTLOADER
-install_bootloader(){
-  print_title "INSTALL BOOTLOADER"
-  print_info "The boot loader is responsible for loading the kernel and initial RAM disk before initiating the boot process."
-  print_info "Grub2 is the de-facto choice for Linux users, and is therefore recommended for beginners."
-  print_warning "\tROOT Partition: ${ROOT_DISK}"
-  print_warning "\tWARNING: There is no support for GRUB + LUKS/LVM."
-  if [[ $UEFI -eq 1 ]]; then
-    print_warning "\tUEFI Mode Detected"
-    bootloaders_list=("Grub2" "Syslinux" "Gummiboot" "Skip")
-  else
-    print_warning "\tBIOS Mode Detected"
-    bootloaders_list=("Grub2" "Syslinux" "Skip")
-  fi
-  PS3="$prompt1"
-  echo -e "Install bootloader:\n"
-  select bootloader in "${bootloaders_list[@]}"; do
-    case "$REPLY" in
-      1)
-        pacstrap ${MOUNTPOINT} grub os-prober
-        break
-        ;;
-      2)
-        pacstrap ${MOUNTPOINT} syslinux
-        break
-        ;;
-      3)
-        [[ $UEFI -eq 1 ]] && pacstrap ${MOUNTPOINT} gummiboot
-        break
-        ;;
-      4)
-        [[ $UEFI -eq 1 ]] && break || invalid_option
-        ;;
-      *)
-        invalid_option
-        ;;
-    esac
-  done
-  [[ $UEFI -eq 1 ]] && pacstrap ${MOUNTPOINT} efibootmgr dosfstools
-}
-
-#CONFIGURE BOOTLOADER - INSTALLED SYSTEM
-# Modified by Carl Duff. Removed the "manual" options and the '--debug' flag for non-UEFI grub installations.
-configure_bootloader(){
-  case $bootloader in
-    Grub2)
-      print_title "INSTALL GRUB2"
-      print_info "The GRand Unified Bootloader (GRUB) is responsible for starting the installed system."
-      echo
-      if [[ $UEFI -eq 1 ]]; then
-         arch_chroot "grub-install --target=x86_64-efi --efi-directory=${EFI_DISK} --bootloader-id=arch_grub --recheck"
-      else
-         arch_chroot "grub-install --target=i386-pc --recheck ${BOOT_DISK}"
-      fi
-     
-      arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
-      ;;
-      
-    Syslinux)
-      print_title "INSTALL SYSLINUX"
-      print_info "Syslinux is a collection of boot loaders capable of booting from hard drives, CDs, and over the network via PXE. It supports the fat, ext2, ext3, ext4, and btrfs file systems."
-      syslinux_install_mode=("[MBR] Automatic" "[PARTITION] Automatic")
-      PS3="$prompt1"
-      echo -e "Syslinux Install:\n"
-      select OPT in "${syslinux_install_mode[@]}"; do
-        case "$REPLY" in
-          1)
-            arch_chroot "syslinux-install_update -iam"
-            if [[ $LUKS -eq 1 ]]; then
-              sed -i "s/APPEND root=.*/APPEND root=\/dev\/mapper\/${ROOT_PART} cryptdevice=\/dev\/${LUKS_DISK}:crypt ro/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            elif [[ $LVM -eq 1 ]]; then
-              sed -i "s/sda[0-9]/\/dev\/mapper\/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            else
-              sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            fi
-            
-            # If an LTS kernel has been installed, ensure syslinux.cfg is updated
-            if [[ $LTS -eq 1 ]]; then
-                sed -i 's/linux/linux-lts/' ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            fi
-            
-            print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
-            pause_function
-            gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            break
-            ;;
-          2)
-            arch_chroot "syslinux-install_update -i"
-            if [[ $LUKS -eq 1 ]]; then
-              sed -i "s/APPEND root=.*/APPEND root=\/dev\/mapper\/${ROOT_PART} cryptdevice=\/dev\/${LUKS_DISK}:crypt ro/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            elif [[ $LVM -eq 1 ]]; then
-              sed -i "s/sda[0-9]/\/dev\/mapper\/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            else
-              sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            fi
-            
-            # If an LTS kernel has been installed, ensure syslinux.cfg is updated
-            if [[ $LTS -eq 1 ]]; then
-                sed -i 's/linux/linux-lts/' ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            fi
-            
-            print_warning "The partition in question needs to be whatever you have as / (root), not /boot."
-            pause_function
-            gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
-            break
-            ;;
-          *) 
-             invalid_option
-            ;;
-        esac
-      done
-      ;;
-    Gummiboot)
-      print_title "INSTALL GUMMIBOOT"
-      print_info "Gummiboot is a UEFI boot manager written by Kay Sievers and Harald Hoyer. It is simple to configure, but can only start EFI executables, the Linux kernel EFISTUB, UEFI Shell, grub.efi, and such."
-      print_warning "\tGummiboot heavily suggests that /boot is mounted to the EFI partition, not /boot/efi, in order to simplify updating and configuration."
- 
-      arch_chroot "gummiboot install"
-      print_warning "Please check your .conf file"
-      partuuid=`blkid -s PARTUUID ${ROOT_DISK} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
-      
-      if [[ $LUKS -eq 1 ]]; then
-            echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\tcryptdevice=\/dev\/${LUKS_DISK}:luks root=\/dev\/mapper\/${ROOT_PART} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-      elif [[ $LVM -eq 1 ]]; then
-            echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=\/dev\/mapper\/${ROOT_PART} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-      else
-            echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-      fi
-
-      echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}/boot/loader/loader.conf
-      pause_function
-      gksu leafpad ${MOUNTPOINT}/boot/loader/entries/arch.conf
-      gksu leafpad ${MOUNTPOINT}/boot/loader/loader.conf
-      ;;
-  esac      
-}
-
-#ROOT PASSWORD {{{
-root_password(){
-  print_title "ROOT PASSWORD"
-  print_info "Root is essentially the admin or super-user account."
-  print_info "You may use the same password for both the root and personal user accounts."
-  echo
-  print_warning "Enter your new root password"
-  arch_chroot "passwd"
-  pause_function
-}
-
-#CREATE NEW USER
-# Modified /simplified  by Carl Duff from the AUI script. Option to pick default editor
-# has been removed, and arch_chroot functions added as this is not being run from the
-# installed system. This function is somewhat weak in respect to error handling.
-  create_new_user(){
-	print_title "CREATE NEW USER"
-	print_warning "If mis-matching passwords are entered, then just repeat this step for the same user name."
-	print_info "Enter your personal account username. You will then be asked for a password. This option may also be repeated to add any number of users."
-    print_info "- The user will be added to the Wheel group"
-    print_info "- A home directory will be created based on the /etc/.skel/ profile, and ownership given to the user"
-    print_info "- The sudoers file will be amended to give permissions to members of the Wheel group"
-    echo 
-    read -p "Username: " username
-    arch_chroot "useradd -m -g users -G wheel,storage,power -s /bin/bash ${username}"
-    arch_chroot "passwd ${username}"
-
-    arch_chroot "cp /etc/skel/.bashrc /home/${username}"
-    arch_chroot "chown -R ${username}:users /home/${username}"
-    arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
-
-    pause_function
-  }
-
-
-#INSTALL SYNAPTICS, XORG AND ALSA PACKAGES
-# Written by Carl Duff.
-install_alsa_xorg_input() {
- print_title "INSTALL GRAPHICS, INPUT, AND SOUND PACKAGES/DRIVERS"
- print_info "Before installing graphics card driver(s) or desktop environments, other packages are needed first:"
- echo
- print_info "alsa         - Advanced Linux Sound Architecture. Device drivers for sound cards."
- print_info "xorg-*       - Packages providing an open-source implementation of the X window system, needed for graphical interfaces."
- print_info "xf86-input-* - Packages providing open-source drivers for keyboards, touchpads, etc."
- echo
- print_warning "Once this process has been completed, graphics card driver(s) will be installed."
- echo
- pause_function
- pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard
- 
- # Use the keymap input in the first option to create the X11 keyboard configuration file for the installed system
-   echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${KEYMAP_XKB:0:2}"\"\nEndSection" > ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
-
- pause_function
-}
-
-#INSTALL GRAPHCS CARD DRIVER
-# Written by Carl Duff. This replaces the install_video_card and detect_vga functions.
-# The intention is to remove too much automation from the installation process.
-
-install_graphics_card_driver(){
-  
-  # VirtualBox installation
-  if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
-    print_title "VIRTUALBOX INSTALLATION DETECTED"
-    
-  # LTS Kernel installed 
-    if [[ $LTS -eq 1 ]]; then
-       print_warning "As the LTS Kernel has been installed, the configuration process can only be semi-automated:"
-       print_info "- virtualbox-guest-utils, virtualbox-guest-modules-lts, and mesa-libgl packages will be installed."
-       print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
-       print_warning "After booting into the installed system, enter the following commands into the terminal to manually load the modules. This need only be done ONCE:"
-       echo " $ su"
-       echo " # depmod -a"
-       echo " # modprobe -a vboxvideo vboxguest vboxsf"
-       echo " # reboot" 
-       echo
-       pause_function
-       pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
-    
-    else  
-    # Standard Kernel installed
-       print_warning "As Arch is being installed in Virtualbox, the configuration process will be automated:"
-       print_info "- virtualbox-guest-utils. virtualbox-guest-modules, and mesa-libgl packages will be installed"
-       print_info "- vboxguest, vboxsf, and vboxvideo kernel modules will be loaded via the modprobe command"
-       print_info "- vboxservice for systemd will be enabled (systemctl enable vboxservice)"
-       echo
-       pause_function
-       pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl   
-       arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"   
-    fi
-  
-    # Enable vboxservice whatever the kernel type
-    arch_chroot "systemctl enable vboxservice"
-
-   # Real Hardware Installation
-   else 
-     print_title "GRAPHICS CARD CONFIGURATION"
-     print_warning "Only open source drivers are currently provided."
-     print_info "- AMD's Catalyst driver is not officially supported by Arch Linux. Use Radeon instead."
-     print_info "- Nouveau is the open source driver for NVIDIA graphics cards."
-     print_info "- If your graphics card is not listed here - or if you are not sure - pick VESA."
-     echo
-     echo "1) Bumblebee"
-     echo "2) Intel"
-     echo "3) NVIDIA / Nouveau"
-     echo "4) AMD / Radeon"
-     echo "5) VMWare"
-     echo "6) VESA (generic)"
-     echo
-     read_input $GRAPHICS_CARD
-     case "$OPTION" in
-     1) # Bumblebee
-        pacstrap ${MOUNTPOINT} bumblebee xf86-video-nouveau nouveau-dri primus virtualgl mesa-libgl mesa xf86-video-vesa
-        arch_chroot "gpasswd -a ${username} bumblebee"
-        arch_chroot "systemctl enable bumblebeed" 
-        ;;      
-     2) # Intel 
-        pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa xf86-video-vesa
-        ;;
-     3) # NVIDIA / Nouveau
-        pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa xf86-video-vesa
-        ;;
-     4) # AMD / Radeon
-        pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa xf86-video-vesa
-        ;;
-     5) # VMWARE
-        pacstrap ${MOUNTPOINT} xf86-video-vmware mesa-libgl mesa xf86-video-vesa
-        ;;
-     6) # VESA 
-        pacstrap ${MOUNTPOINT} xf86-video-vesa mesa-libgl mesa
-        ;;
-     *) invalid_option
-        install_graphics_card_driver
-        ;;
-     esac
-  fi
-  pause_function
-}  
-
-#INSTALL DESKTOP ENVIRONMENT AND WINDOW MANAGER
-# Written by Carl Duff. adapted from and replaces the original install_desktop_environment function, along with its
-# multiple sub-functions. Again, this was for the purpose of simplification.
-install_de_wm(){
-  print_title "INSTALL DESKTOP ENVIRONMENT OR WINDOW MANAGER"
-  print_warning "This option may be repeated to install multiple environments."
-  print_info "Gnome, Cinnamon, and KDE come with a network manager, which will automatically be enabled where downloaded."
-  print_info "Gnome, KDE and LXDE come with a display manager, which will be enabled when selecting the display manager step."
-  print_info "There may be a one-time option presented to install some necessary extra packages after installation."
-  echo
-  echo "${BCyan}Full Desktop Environments${Reset}"
-  echo " 1) Cinnamon                   5) LXDE"
-  echo " 2) Enlightenment              6) MATE (2 options)"
-  echo " 3) Gnome 3  (3 options)       7) XFCE (2 options)"
-  echo " 4) KDE      (2 options)"
-  echo
-  echo "${BCyan}Window Managers${Reset}"
-  echo " 8) Awesome                   11) IceWM"
-  echo " 9) FluxBox                   12) Openbox"
-  echo "10) i3                        13) PekWM"     
-  echo ""
-  echo " b) Back"
-  echo
-  read_input $DESKTOPENV
-  
-  case "$OPTION" in
-    1) #Cinnamon
-       pacstrap ${MOUNTPOINT} cinnamon
-       
-       if [[ $NM_INSTALLED -eq 0 ]]; then      
-          arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
-          NM_INSTALLED=1
-       fi
-    ;;
-    2) #Enlightenment
-       pacstrap ${MOUNTPOINT} enlightenment terminology lxpolkit
-    ;;
-    3) #Gnome (3 choices)
-        print_title "GNOME"
-        print_info "There are three installation options available for Gnome. The Minimal option DOES NOT include a network manager."
-        echo " 1) Minimal              (gnome-shell)"
-        echo " 2) Full                 (gnome)"
-        echo " 3) Full + Extras        (gnome + gnome-extra)"
-        echo 
-        echo " b) Back"
-        echo ""
-        read_input $DE_CH
-        case "$OPTION" in
-        1) pacstrap ${MOUNTPOINT} gnome-shell gdm
-           GNOME_INSTALLED=1
-          ;;
-        2) pacstrap ${MOUNTPOINT} gnome
-
-           if [[ $NM_INSTALLED -eq 0 ]]; then         
-              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
-              NM_INSTALLED=1
-           fi
-           
-           GNOME_INSTALLED=1
-          ;;
-        3) pacstrap ${MOUNTPOINT} gnome gnome-extra
-
-           if [[ $NM_INSTALLED -eq 0 ]]; then         
-              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
-              NM_INSTALLED=1
-           fi
-           
-           GNOME_INSTALLED=1
-          ;;
-        *) invalid_option
-           install_de_wm
-          ;;
-        esac
-    ;;    
-    4) #KDE (2 choices)
-        print_title "KDE"
-        print_info "There are two installation options available. The Minimal option DOES NOT include a network manager."
-        echo " 1) Minimal       (kdebase)"
-        echo " 2) Full          (kde)"
-        echo 
-        echo " b) Back"
-        echo ""
-        read_input $DE_CH
-        case "$OPTION" in
-        1) # KDE BASE
-           pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm
-           KDE_INSTALLED=1
-          ;;
-        2) # KDE FULL
-           pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils
-
-           if [[ $NM_INSTALLED -eq 0 ]]; then          
-              arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
-              NM_INSTALLED=1
-           fi
-               
-           KDE_INSTALLED=1
-          ;;
-        *) invalid_option
-           install_de_wm
-          ;;
-        esac
-    ;;    
-    5) #LXDE 
-       pacstrap ${MOUNTPOINT} lxde
-       LXDE_INSTALLED=1
-    ;;
-    6) #MATE
-       print_title "MATE"
-       print_info "There are two installation options available."
-       echo " 1) Full          (mate)"
-       echo " 2) Full + Extras (mate + mate-extra)"
-       echo 
-       echo " b) Back"
-       echo ""
-       read_input $DE_CH
-       case "$OPTION" in
-       1) pacstrap ${MOUNTPOINT} mate
-          ;;
-       2) pacstrap ${MOUNTPOINT} mate mate-extra
-          ;;
-        *) install_de_wm
-          ;;
-        esac   
-    ;;
-    7) # XFCE
-       print_title "XFCE"
-       print_info "There are two installation options available."
-       echo " 1) Full          (xfce4)"
-       echo " 2) Full + Extras (xfce4 + xfce4-goodies)"
-       echo
-       echo " b) Back"
-       echo ""
-       read_input $DE_CH
-       case "$OPTION" in
-       1) pacstrap ${MOUNTPOINT} xfce4 lxpolkit
-          ;;
-       2) pacstrap ${MOUNTPOINT} xfce4 xfce4-goodies lxpolkit
-          ;;
-        *) install_de_wm
-          ;;
-        esac    
-    ;;
-    8) #Awesome
-       pacstrap ${MOUNTPOINT} awesome vicious lxpolkit 
-    ;;
-    9) #Fluxbox 
-       pacstrap ${MOUNTPOINT} fluxbox fbnews fluxter lxpolkit
-    ;;
-    10) #i3
-        pacstrap ${MOUNTPOINT} i3-wm i3lock i3status lxpolkit
-    ;;
-    11) #IceWM
-        pacstrap ${MOUNTPOINT} icewm icewm-themes lxpolkit
-    ;;
-    12) #Openbox
-        pacstrap ${MOUNTPOINT} openbox openbox-themes lxpolkit
-    ;;
-    13) #PekWM
-        pacstrap ${MOUNTPOINT} pekwm pekwm-themes lxpolkit   
-    ;;
-    "b") break
-    ;;
-    *) invalid_option
-       install_de_wm
- esac
- pause_function          
-}
-
-#INSTALL COMMON PACKAGES
-# Written by Carl Duff. Installs basic/common packages required for functionalty.
-install_common(){
- print_title "COMMON PACKAGES"
- print_info "Some environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality."
- print_info "Packages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc."
- print_info "Those installing the full KDE desktop alone will not need to install these."
- print_warning "This is the only time you have the option!"
- echo " 1) Yes, install these packages"
- echo " 2) No, ${Bold}DO NOT${Reset} install these packages"
- echo
- read_input $DE_CH
- 
- if [[ $OPTION -eq 1 ]]; then
-    pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg
- fi 
- 
- COMMON_INSTALLED=1
-}
-
-#INSTALL DISPLAY MANAGER
-# Written by Carl Duff. Detects if KDE and/or GNOME has been installed to ask which DM is desired. Otherwise
-# present choice between LXDM and LightDM. No SLiM as this seems to have issues.
-install_dm() {
+# Adapted from AIS. However, this does not assume that the formatted device is the Root
+# installation device; more than one device may be formatted. This is now set in the
+# mount_partitions function, when the Root is chosen.
+select_device() {
 	
-   if 	[[ $DM_INSTALLED -eq 0 ]]; then
+    DEVICE=""
+    devices_list=(`lsblk -d | awk '{print "/dev/" $1}' | grep 'sd\|hd\|vd'`);
+    
+    for i in ${devices_list[@]}; do
+        DEVICE="${DEVICE} ${i} -"
+    done
+    
+    dialog --backtitle "$VERSION" --title " Select Device " --menu "\n." 10 40 3 ${DEVICE} 2>${ANSWER} || prep_menu
+    DEVICE=$(cat ${ANSWER}) 
+  }
+
+# Adapted from AIS. Integrated Gparted, and dropped most of the other partitioning tools.
+create_partitions(){
+# add more paritioning tools
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Partitioning Tool " \
+    --menu $"\nGParted is a recommended user-friendly graphical tool that supports both BIOS and UEFI systems." 13 55 3 \
+ 	"1" $"GParted (GUI - BIOS & UEFI)" \
+	"2" $"CFDisk  (CLI - BIOS)" \
+	"3" $"GDisk   (CLI - UEFI/GPT)" 2>${ANSWER}	
+
+    case $(cat ${ANSWER}) in
+        "1") gksu gparted ${DEVICE} 
+             ;;
+        "2") cfdisk ${DEVICE}
+             ;;
+        "3") gdisk ${DEVICE}
+             ;;
+          *) prep_menu
+             ;;
+    esac  	
+}	
+
+# find all available partitions and generate a list of them
+# This also includes partitions on different devices.
+find_partitions() {
+	
+	
+	PARTITIONS=""
+    partition_list=(`lsblk | grep 'part\|lvm' | awk '{print substr($1,3)}'`)
+	
+    for i in ${partition_list[@]}; do
+        PARTITIONS="${PARTITIONS} ${i} -"
+    done
+    
+    echo $PARTITIONS
+    NUMBER_PARTITIONS=${#partition_list[@]}
+    
+    # Deal with incorrect partitioning
+    if [[ $NUMBER_PARTITIONS < 2 ]] && [[ $UEFI -eq 1 ]]; then
+        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Partitioning Error " --msgbox $"\nUEFI systems require a minimum of two partitions for installation (ROOT and UEFI).\n\nPlease configure your partitions." 0 0
+        create_partitions
+    fi
+    
+    if [[ $NUMBER_PARTITIONS -eq 0 ]] && [[ $UEFI -eq 0 ]]; then
+        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " BIOS Partitioning Error " --msgbox $"\nBIOS systems require a minmum of one partition for installation (ROOT).\n\nPlease configure your partitions." 0 0	
+        create_partitions
+    fi
+}
+
+# Not all filesystems available are viable, so set static list.
+select_filesystem(){
+	
+	dialog --backtitle "$VERSION" --title " Choose Filesystem " \
+    --menu $"Ext4 is recommended for beginners." 19 30 11 \
+ 	"1" $"SKIP" \
+	"2" $"btrfs" \
+	"3" $"ext2" \
+ 	"4" $"ext3" \
+	"5" $"ext4" \
+	"6" $"jfs" \
+ 	"7" $"nilfs2" \
+	"8" $"ntfs" \
+	"9" $"reiserfs" \
+ 	"10" $"vfat" \
+	"11" $"xfs" 2>${ANSWER}		
+
+    case $(cat ${ANSWER}) in
+        "1") FILESYSTEM="skip"
+             ;;
+        "2") FILESYSTEM="mkfs.btrfs -f"
+             ;;
+        "3") FILESYSTEM="mkfs.ext2 -F"
+             ;;
+        "4") FILESYSTEM="mkfs.ext3 -F"
+             ;;            
+        "5") FILESYSTEM="mkfs.ext4 -F"
+             ;;
+        "6") FILESYSTEM="mkfs.jfs -q"
+             ;;
+        "7") FILESYSTEM="mkfs.nilfs2 -f"
+             ;;  
+        "8") FILESYSTEM="mkfs.ntfs -q"
+             ;;  
+        "9") FILESYSTEM="mkfs.reiserfs -f -f"
+             ;;  
+       "10") FILESYSTEM="mkfs.vfat -F32"
+             ;;  
+       "11") FILESYSTEM="mkfs.xfs -f"
+             ;;      
+          *) prep_menu
+             ;;
+    esac 	
+
+  }
+  
+mount_partitions() {
+	
+	# Ensure all partitions are unmounted (e.g. could still be mounted from the partitioning tool)
+    # Then list available partitions
+	find_partitions
+	
+	# Identify and mount root
+	dialog --backtitle "$VERSION" --title " Select ROOT Partition " --menu "\n." 12 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu
+	PARTITION=$(cat ${ANSWER})
+    ROOT_PART=${PARTITION}
+	INST_DEV=$"/dev/"$(cat ${ANSWER} | sed 's/[0-9]*//g')
+	
+	select_filesystem
+	if [[ $FILESYSTEM != "skip" ]]; then	
+	   ${FILESYSTEM} $"/dev/"${PARTITION} >/dev/null 2>&1
+	fi
+	
+	mkdir -p ${MOUNTPOINT}
+	mount $"/dev/"${PARTITION} ${MOUNTPOINT}
+    confirm_mount ${MOUNTPOINT}
+	
+	# Identify and create swap, if applicable
+    dialog --backtitle "$VERSION" --title " Select SWAP Partition " --menu "\n." 12 40 4 ${PARTITIONS} $"none" $"-" 2>${ANSWER} || config_base_menu  
+    if [[ $(cat ${ANSWER}) != "none" ]]; then
+    
+       PARTITION=$(cat ${ANSWER})
+       
+       #swapoff $"/dev/"${PARTITION}
+       mkswap  $"/dev/"${PARTITION} >/dev/null 2>&1
+       swapon  $"/dev/"${PARTITION} >/dev/null 2>&1
+       
+       PARTITIONS="$(echo $PARTITIONS | sed s/${PARTITION}$' -'//)"
+       NUMBER_PARTITIONS=$(( NUMBER_PARTITIONS - 1 ))
+    fi
+    
+    ## Extra Step for VFAT UEFI Partition
+    if [[ $UEFI -eq 1 ]]; then
+    
+       dialog --backtitle "$VERSION" --title " Select UEFI Partition " --menu "\n." 12 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu  
+       PARTITION=$(cat ${ANSWER})
+       
+       ## If there is already a fat/vfat partition...
+       if [[ $(fsck -N /dev/$PARTITION | grep fat) ]]; then
+          dialog --backtitle "$VERSION" --title " UEFI Partition " --yesno $"The UEFI partition $PARTITION has already been formatted.\n\nReformat? Doing so will erase ALL data already on that partition." 0 0 && mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
+       else 
+          mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
+       fi   
+       
+       dialog --backtitle "$VERSION" --title " Select UEFI Mountpoint " --menu $"\n/boot is recommended, especially if intending to use the Gummiboot bootloader." 12 40 2 \
+ 	   "1" $"/boot" \
+	   "2" $"/boot/efi" 2>${ANSWER}	
+       
+       case $(cat ${ANSWER}) in
+        "1") UEFI_PART="/boot"
+             ;;
+        "2") UEFI_PART="/boot/efi"
+             ;;
+          *) config_base_menu
+             ;;
+       esac
+       
+       mkdir -p ${MOUNTPOINT}${UEFI_PART}
+       mount $"/dev/"${PARTITION} ${MOUNTPOINT}${UEFI_PART}
+       confirm_mount ${MOUNTPOINT}${UEFI_PART}     
+       
+    fi
+    
+    ## All other partitions
+       while [[ $NUMBER_PARTITIONS > 0 ]]; do 
+             dialog --backtitle "$VERSION" --title " Select Partition " --menu "\n." 12 40 4 ${PARTITIONS} $"done" $"-" 2>${ANSWER} || config_base_menu 
+             PARTITION=$(cat ${ANSWER})
+             
+             if [[ $PARTITION == "done" ]]; then
+                break;
+             else
+                MOUNT=""
+                
+                select_filesystem
+	            if [[ $FILESYSTEM != "skip" ]]; then	
+	               ${FILESYSTEM} $"/dev/"${PARTITION} >/dev/null 2>&1
+	            fi
+                
+                dialog --backtitle "$VERSION" --title " Name Partition: $PARTITON " --inputbox "\nExamples include: /boot or /home.\n\nEnsure the name is preceeded by a forward slash (/)." 11 65 "/" 2>${ANSWER} || config_base_menu
+                MOUNT=$(cat ${ANSWER})
+                
+                mkdir -p ${MOUNTPOINT}${MOUNT}
+                mount $"/dev/"${PARTITION} ${MOUNTPOINT}${MOUNT}
+                confirm_mount ${MOUNTPOINT}${MOUNT}
+             fi
+       done
+}	
+	
+######################################################################
+##																	##
+##                    Installation Functions						##
+##																	##
+######################################################################	
+
+install_base() {
+
+    if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
+       dialog --backtitle "$VERSION" --title " Installation Note " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
+    else
+       dialog --backtitle "$VERSION" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 20 55
+    fi
+    
+    dialog --backtitle "$VERSION" --title " Install Base " \
+    --menu $"\nThe latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer.\n" 14 40 4 \
+ 	"1" $"Latest Kernel" \
+	"2" $"Latest Kernel & base-devel" \
+	"3" $"LTS Kernel" \
+	"4" $"LTS Kernel & base-devel" 2>${ANSWER}	
+
+    case $(cat ${ANSWER}) in
+        "1") # Latest Kernel
+             clear
+             pacstrap ${MOUNTPOINT} base btrfs-progs ntp sudo 
+             ;;
+        "2") # Latest Kernel and base-devel
+             pacstrap ${MOUNTPOINT} base base-devel btrfs-progs ntp sudo
+             ;;
+        "3") # LTS Kernel
+             pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs btrfs-progs ntp sudo
+             LTS=1
+             ;;
+        "4") # LTS Kernel and base-devel
+             pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs base-devel btrfs-progs ntp sudo
+             LTS=1
+             ;;
+          *) install_base_menu
+             ;;
+    esac  	
+
+  #check for a wireless device
+  WIRELESS_DEV=`ip link | grep wlp | awk '{print $2}'| sed 's/://' | sed '1!d'`
+  if [[ -n $WIRELESS_DEV ]]; then
+     dialog --backtitle "$VERSION - $SYSTEM" --title " Wireless Device Detected " --infobox "\nInstalling supplementary wireless packages..." 7 40 
+     sleep 2
+     clear
+     pacstrap ${MOUNTPOINT} iw wireless_tools wpa_actiond wpa_supplicant dialog
+  fi
+
+}
+
+# Adapted from AIS. Integrated the configuration elements, and for UEFI systems, fixed the 
+# gummiboot installation, dropped syslinux and replaced it with rEFInd.
+install_bootloader() {
+	
+# FIX SYSLINUX
+bios_bootloader() {
+   dialog --backtitle "$VERSION" --title " Install Bootloader (BIOS) " \
+    --menu $"\nGrub2 is recommended for beginners as the most popular and versatile option.\n\nSyslinux is a lighter and simpler alternative, usually used by Linux installation ISOs." 14 50 2 \
+ 	"1" $"Install Grub2" \
+	"2" $"Install Syslinux" 2>${ANSWER}	
+	case $(cat ${ANSWER}) in
+        "1") clear
+             pacstrap ${MOUNTPOINT} grub os-prober
+             arch_chroot "grub-install --target=i386-pc --recheck ${INST_DEV}"
+             arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
+             ;;
+        "2") clear
+             pacstrap ${MOUNTPOINT} syslinux
+             arch_chroot "syslinux-install_update -iam"
+             sed -i "s/sda[0-9]/${ROOT_PART}/g" ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+             # If the LTS kernel has been installed amend the config file accordingly
+             [[ $LTS -eq 1 ]] && sed -i 's/linux/linux-lts/g' ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+             dialog --title " Syslinux Configuration Check " --msgbox "\nPlease check the syslinux configuration file.\n\nIt should contain the command:\nAPPEND root=/dev/$ROOT_PART rw\n" 10 50
+             gksu leafpad ${MOUNTPOINT}/boot/syslinux/syslinux.cfg
+             ;;
+          *) install_base_menu
+             ;;
+    esac  
+}
+
+uefi_bootloader() {
+
+    #Ensure efivarfs is mounted (due to unmounting undertaken during the partitioning stage)
+    dialog --backtitle "$VERSION - $SYSTEM" --title " Configuring UEFI " --infobox "\nEnsuring efivars is mounted..." 7 40 
+    sleep 2
+	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+     
+    dialog --backtitle "$VERSION" --title " Install Bootloader (UEFI) " \
+    --menu $"\nGrub2 is recommended for beginners as the most popular and versatile option.\n\nGummiboot is a popular choice for UEFI systems, and recommends mounting the UEFI partition at /boot.\n\nrEFInd is a simple and fully automated alternative." 17 55 3 \
+ 	"1" $"Install Grub2" \
+	"2" $"Install Gummiboot" \
+	"3" $"Install rEFInd" 2>${ANSWER}	
+	case $(cat ${ANSWER}) in
+        "1") clear
+             pacstrap ${MOUNTPOINT} grub os-prober
+             arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_PART} --bootloader-id=arch_grub --recheck"
+             ;;
+        "2") clear
+             pacstrap ${MOUNTPOINT} gummiboot
+             arch_chroot "gummiboot --path=${UEFI_PART} install"
+             partuuid=`blkid -s PARTUUID ${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
+             echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+             echo -e "default  arch\ntimeout  4" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+             dialog --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files.\n" 8 40
+             gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
+             gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+             ;;
+         "3") clear
+              pactrap ${MOUNTPOINT} refind-efi
+              arch_chroot "refind-install"
+              ;;
+          *) install_base_menu
+             ;;
+    esac 
+    
+    dialog --backtitle "$VERSION - $SYSTEM" --title " UEFI Tools " --infobox "\nInstalling supplementary UEFI packages..." 7 40 
+    sleep 2
+    clear
+    pacstrap ${MOUNTPOINT} efibootmgr dosfstools 
+}
+
+    if [[ $UEFI -eq 0 ]]; then
+       bios_bootloader
+    else
+       uefi_bootloader
+    fi
+}
+
+# Install alsa, xorg and input drivers
+# Also use the xkbmap set earlier to create a keyboard configuration file for the installed system
+install_alsa_xorg_input() {
+
+  dialog --backtitle "$VERSION" --title " ALSA, Xorg, and Input " --msgbox "\nBefore installing graphics card driver(s) or desktop environments, other packages are needed first:\n\nalsa - Advanced Linux Sound Architecture\nxorg-* - open-source X window system for graphics\nxf86-input-* - open-source drivers for input devices" 12 60
+  clear	
+  pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard xf86-input-vmmouse
+  echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${XKBMAP}"\"\nEndSection" > ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
+
+}
+
+
+
+setup_graphics_card() {
+
+# basically this is used to manually set the GC_DETECTED variable
+gc_driver_menu() {
+
+   dialog --backtitle "$VERSION" --title " Graphics Card Menu " \
+    --menu $"\nIf you are unsure - or your card is not listed - pick 'Unknown / All', which will install all listed drivers. At least one of them worked to boot Evo!\n" 17 50 7 \
+ 	"1" $"AMD/ATI" \
+	"2" $"Intel" \
+	"3" $"NVIDIA" \
+	"4" $"Via" \
+	"5" $"VirtualBox" \
+    "6" $"VMWare" \
+	"7" $"Unknown / All" 2>${ANSWER}
+
+   case $(cat ${ANSWER}) in
+        "1") GC_DETECTED="ATI"
+             ;;
+        "2") GC_DETECTED="Intel"
+             ;;
+        "3") GC_DETECTED="NVIDIA"
+             ;;
+        "4") GC_DETECTED="Via"
+             ;;            
+        "5") GC_DETECTED="VirtualBox"
+             ;;
+        "6") GC_DETECTED="VMware"
+             ;;
+        "7") GC_DETECTED="all"
+             ;;
+          *) install_desktop_menu
+             ;;
+    esac  
+    install_gc
+}
+
+# Adapted from Anterogos' CLI installer (2.0)
+detect_graphics_card() {
+	
+    if   [[ `echo ${GRAPHIC_CARD}|grep -i 'ati[[:space:]]'` != "" ]]; then
+         GC_DETECTED="ATI" 
+    elif [[ `echo ${GRAPHIC_CARD}|grep -i 'nvidia[[:space:]]'` != "" ]]; then
+         GC_DETECTED="NVIDIA" 
+    elif [[ `echo ${GRAPHIC_CARD}|grep -i 'intel[[:space:]]'` != "" ]] || [ `echo ${GRAPHIC_CARD}|grep -i 'lenovo[[:space:]]'` != "" ]]; then
+         GC_DETECTED="Intel"
+    elif [[ `echo ${GRAPHIC_CARD}|grep -i 'virtualbox[[:space:]]'` != "" ]]; then
+         GC_DETECTED="VirtualBox"
+    elif [[ `echo ${GRAPHIC_CARD}|grep -i 'vmware[[:space:]]'` != "" ]]; then
+         GC_DETECTED="VMware"
+    elif [[ `echo ${GRAPHIC_CARD}|grep -i 'via[[:space:]]'` != "" ]]; then
+         GC_DETECTED="Via"
+    else
+         GC_DETECTED="Unknown"
+    fi
+
+}
+
+install_gc() {
+
+ clear
+ if   [[ $GC_DETECTED == "ATI" ]]; then
+      pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa
+      sed -i 's/^MODULES=(/MODULES=(radeon /' ${MOUNTPOINT}/etc/mkinitcpio.conf
+ elif [[ $GC_DETECTED == "NVIDIA" ]]; then
+      pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa
+      sed -i 's/^MODULES=(/MODULES=(nouveau /' ${MOUNTPOINT}/etc/mkinitcpio.conf
+ elif [[ $GC_DETECTED == "Intel" ]]; then
+      pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa
+      sed -i 's/^MODULES=(/MODULES=(i915 /' ${MOUNTPOINT}/etc/mkinitcpio.conf
+ elif [[ $GC_DETECTED == "VirtualBox" ]]; then
+      if [[ $LTS -eq 1 ]]; then
+         dialog --backtitle "$VERSION" --title " VirtualBox Detected " --msgbox "\nAs the LTS kernel has been installed, the configuration process can only be semi-automated.\n\nA one-off series of commands to load the necessary modules for VirtualBox will be required AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
+         pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
+      else
+         pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl   
+         arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"   
+      fi
+      # Enable vboxservice whatever the kernel type
+      arch_chroot "systemctl enable vboxservice"
+ elif [[ $GC_DETECTED == "VMWare" ]]; then
+      pacstrap ${MOUNTPOINT} xf86-video-vmware mesa-libgl mesa
+ elif [[ $GC_DETECTED == "Via" ]]; then
+      pacstrap ${MOUNTPOINT} xf86-video-openchrome
+ elif [[ $GC_DETECTED == "all" ]]; then 
+      pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri xf86-video-nouveau nouveau-dri xf86-video-intel intel-dri xf86-video-fbdev xf86-video-vmware xf86-video-openchrome mesa-libgl mesa      
+ else
+      gc_driver_menu  
+ fi
+
+}
+
+    detect_graphics_card
+    if [[ $GC_DETECTED == "Unknown" ]]; then
+       gc_driver_menu
+    else
+       dialog --backtitle "$VERSION" --title " $GC_DETECTED Detected " --yesno "\nIs your graphics card $GC_DETECTED?\n\n-Select 'Yes' to install its open-source driver.\n-Select 'No' to open the graphics card menu." 10 55 && install_gc || gc_driver_menu
+    fi
+
+}
+
+install_de_wm() {
+
+   # Only show this information box once
+   if [[ $SHOW_ONCE -eq 0 ]]; then
+      dialog --backtitle "$VERSION" --title " Install Desktop Environments " --msgbox "\nThis option can be repeated to install multiple environments.\n\nGnome, KDE, and LXDE come with a display manager.\n\nCinnamon, Gnome and KDE come with a Network Manager.\n" 13 55
+   fi
+   
+	dialog --backtitle "$VERSION" --title " Install Desktop Environments  " \
+    --menu "\nDesktop Environments are listed first, and may have multiple download options.\n\nKDE is a 750MB+ download." 19 45 8 \
+ 	"1" $"Cinnamon" \
+	"2" $"Enlightenment" \
+	"3" $"Gnome-Shell (minimal)" \
+	"4" $"Gnome" \
+	"5" $"Gnome + Extras" \
+    "6" $"KDE Base (minimal)" \
+    "7" $"KDE" \
+    "8" $"LXDE" \
+    "9" $"MATE" \
+    "10" $"MATE + Extras" \
+    "11" $"Xfce" \
+    "12" $"Xfce + extras" \
+    "13" $"Awesome WM" \
+    "14" $"Fluxbox WM" \
+	"15" $"i3 WM" \
+    "16" $"Ice WM" \
+    "17" $"Openbox WM" \
+    "18" $"Pek WM" 2>${ANSWER}
+
+   case $(cat ${ANSWER}) in
+        "1") # Cinnamon
+             clear
+             pacstrap ${MOUNTPOINT} cinnamon
+             ;;
+        "2") # Enlightement
+             clear
+             pacstrap ${MOUNTPOINT} enlightenment terminology lxpolkit
+             ;;
+        "3") # Gnome-Shell
+             clear
+             pacstrap ${MOUNTPOINT} gnome-shell gdm
+             GNOME_INSTALLED=1
+             ;;
+        "4") # Gnome
+             clear
+             pacstrap ${MOUNTPOINT} gnome rp-pppoe
+
+             if [[ $NM_INSTALLED -eq 0 ]]; then         
+                arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
+                NM_INSTALLED=1
+             fi
+           
+             GNOME_INSTALLED=1
+             ;;            
+        "5") # Gnome + Extras
+             clear
+             pacstrap ${MOUNTPOINT} gnome gnome-extra rp-pppoe
+
+             if [[ $NM_INSTALLED -eq 0 ]]; then         
+                arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
+                NM_INSTALLED=1
+             fi
+           
+             GNOME_INSTALLED=1
+             ;;
+        "6") # KDE BASE
+             clear
+             pacstrap ${MOUNTPOINT} kdebase-workspace kdeplasma-applets-plasma-nm
+             KDE_INSTALLED=1
+             ;;
+        "7") # KDE 
+             clear
+             pacstrap ${MOUNTPOINT} kde kdeplasma-applets-plasma-nm xdg-user-dirs xdg-utils rp-pppoe
+
+             if [[ $NM_INSTALLED -eq 0 ]]; then          
+                arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
+                NM_INSTALLED=1
+             fi
+               
+             KDE_INSTALLED=1
+             ;;
+         "8") # LXDE
+              clear
+              pacstrap ${MOUNTPOINT} lxde
+              LXDE_INSTALLED=1
+             ;;
+         "9") # MATE
+              clear
+              pacstrap ${MOUNTPOINT} mate
+             ;;
+        "10") # MATE + Extras
+               clear
+               pacstrap ${MOUNTPOINT} mate mate-extra
+             ;;                 
+        "11") # Xfce
+              clear
+              pacstrap ${MOUNTPOINT} xfce4 lxpolkit
+             ;;            
+        "12") # Xfce + Extras
+              clear
+              pacstrap ${MOUNTPOINT} xfce4 xfce4-goodies lxpolkit
+             ;;
+        "13") # Awesome
+              clear
+              pacstrap ${MOUNTPOINT} awesome vicious lxpolkit
+             ;;
+        "14") #Fluxbox
+              clear 
+              pacstrap ${MOUNTPOINT} fluxbox fbnews fluxter lxpolkit
+             ;; 
+        "15") #i3
+              clear
+              pacstrap ${MOUNTPOINT} i3-wm i3lock i3status lxpolkit
+             ;; 
+        "16") #IceWM
+              clear
+              pacstrap ${MOUNTPOINT} icewm icewm-themes lxpolkit
+             ;; 
+        "17") #Openbox
+              clear
+              pacstrap ${MOUNTPOINT} openbox openbox-themes lxpolkit
+             ;; 
+        "18") #PekWM
+              clear
+              pacstrap ${MOUNTPOINT} pekwm pekwm-themes lxpolkit 
+             ;;            
+          *) install_desktop_menu
+             ;;
+    esac  
+    
+    # Offer to install common packages
+    if [[ $COMMON_INSTALLED -eq 0 ]]; then
+       dialog --backtitle "$VERSION" --title " Install Common Packges? " --yesno "\nSome environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality.\n\nPackages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc. Those installing the full KDE desktop alone will not need to install these.\n\nThis option will only be presented ONCE.\n" 16 60 \
+       && clear && pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg
+    fi
+    
+    # Either way, the option will no longer be presented.
+    COMMON_INSTALLED=1
+
+}
+
+# Determine if LXDE, Gnome, and/or KDE has been installed, and act accordingly.
+install_dm() {
+
+ if 	[[ $DM_INSTALLED -eq 0 ]]; then
 	
          if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
-               print_title "DISPLAY MANAGER: KDE INSTALLED"
-               print_info "As KDE has been installed, its native display manager - KDM - has now been enabled."
                arch_chroot "systemctl enable kdm.service"
-                  
+               dialog --backtitle "$VERSION" --title " KDM Enabled " --msgbox "\nAs KDE has been installed, its native display manager - KDM - has now been enabled.\n" 9 35
+    
          elif  [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
-               print_title "DISPLAY MANAGER: GNOME INSTALLED"
-               print_info "As Gnome has been installed, its native display manager - GDM - has now been enabled."
                arch_chroot "systemctl enable gdm.service"
-  
+               dialog --backtitle "$VERSION" --title " GDM Enabled " --msgbox "\nAs Gnome has been installed, its native display manager - GDM - has now been enabled.\n" 9 35
+
          elif  [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
-               print_title "DISPLAY MANAGER: KDE AND GNOME INSTALLED"
-               print_info "Both the KDE and Gnome Display Managers have been installed. Please choose one to enable."
-               echo " 1) GDM (Gnome)"
-               echo " 2) KDM (KDE)"
-               echo ""
-               read_input $DM_CH
-               case "$OPTION" in
-                    1) arch_chroot "systemctl enable gdm.service"
-                       ;;
-                    *) arch_chroot "systemctl enable kdm.service"
-                       ;;
-               esac
+         
+               dialog --backtitle "$VERSION" --title " Choose GDM or KDM " \
+               --menu $"\nBoth Gnome and KDE have been installed. Please select your preferred display manager.\n" 12 45 2 \
+ 	           "1" $"GDM (Gnome)" \
+	           "2" $"KDM (KDE)" 2>${ANSWER}	
+	
+	          case $(cat ${ANSWER}) in
+              "1") arch_chroot "systemctl enable gdm.service" 
+                ;;
+              "2") arch_chroot "systemctl enable kdm.service"
+                ;;
+                *) install_desktop_menu
+                ;;
+              esac 
          
          elif [[ $LXDE_INSTALLED -eq 1 ]]; then
-              print_title "DISPLAY MANAGER: LXDE INSTALLED"
-              print_info "As LXDE has been installed, its native display manager - LXDM - has now been enabled."
               arch_chroot "systemctl enable lxdm.service"
+              dialog --backtitle "$VERSION" --title " LXDM Enabled " --msgbox "\nAs LXDE has been installed, its native display manager - LXDM - has now been enabled." 9 35
          
-         else print_title "INSTALL DISPLAY MANAGER: CHOOSE LXDM OR LIGHTDM"
-              print_warning "Some desktop environments come with a display manager by default, which will be detected in this section. Ensure all desired desktop environments have been installed first."
-              print_info "Please choose between LXDM or LightDM. LXDM is recommended for beginners."
-              echo " 1) LXDM"
-              echo " 2) LightDM"
-              echo
-              echo " b) Back"
-              echo
-              read_input $DM_CH
-              case "$OPTION" in
-                   1) # LXDM
-                      pacstrap ${MOUNTPOINT} lxdm
-                      arch_chroot "systemctl enable lxdm.service"
-                      ;;
-                   2) # LIGHTDM
-                      pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
-                      arch_chroot "systemctl enable lightdm.service"
-                      ;;
-                 "b") break
-                      ;;
-                   *) invalid_option
-                      install_dm
-                      ;;
-              esac
-         fi     
-         DM_INSTALLED=1
-         pause_function
- 
-   else  print_title "INSTALL DISPLAY MANAGER: OPTION ALREADY COMPLETED"
-         print_info "A display manager has already been installed and enabled."
-         echo
-         pause_function
-   fi       
- }        
-         
-#SET UP NETWORK FOR INSTALLED SYSTEM
-setup_network_manager(){
- print_title "NETWORK MANAGEMENT"
-    
- if [[ $NM_INSTALLED -eq 0 ]]; then
- 
-    print_warning "Some desktop environments come with a network manager by default, which will be automatically enabled. Ensure all desired desktop environments have been installed first."
-    print_info "Network connection managers can automatically manage wireless and wired interfaces."
-    print_info "Network Manager is recommended for beginners, especially where using a wireless connection."
-    echo
-    echo "${BCyan}Network Connection Manager Selection${Reset}"
-    echo "1) Connman (command line)"
-    echo "2) dhcpcd  (command line)"
-    echo "3) Network Manager (desktop graphical interface)"
-    echo "4) WICD (desktop graphical interface)"
-    echo
-    echo "b) Back"
-    echo
-    read_input $NETMANOPT
-  
-    case "$OPTION" in
-      1) # connman
-         pacstrap ${MOUNTPOINT} connman 
-         arch_chroot "systemctl enable connman.service"
-         ;;
-      2) # dhcpcd
-         arch_chroot "systemctl enable dhcpcd.service"
-         ;;
-      3) # Network Manager
-         pacstrap ${MOUNTPOINT} networkmanager network-manager-applet
-         arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
-         ;;
-      4) # WICD
-         pacstrap ${MOUNTPOINT} wicd-gtk
-         arch_chroot "systemctl enable wicd.service"
-         ;;
-     "b") break
-         ;;
-      *) invalid_option
-         setup_network_manager  
-        ;;
-     esac
-     NM_INSTALLED=1
-     
- else
-  
-    print_info "A network manager has already been installed and enabled."
-    echo
-    pause_function
-  
- fi
-}
-
-    
-#}}}
-#FINISH {{{
-# Modified and simplified by Carl Duff. Removed code to copy AUI script to the installed system, 
-# and now automatically unmount partitions. and ask user to reboot their system manually.
-finish(){
-  print_title "INSTALLATION COMPLETED!"
-  
-  # Fix for systemd.
-  #if [[ -e ${MOUNTPOINT}/etc/machine-id ]]; then
-     umount_partitions
-  #else
-  #   arch_chroot "uuidgen | { read; echo "${REPLY//-}">/etc/machine-id; }"
-  #   umount_partitions
-  #fi
-  
-  print_info "You can reboot or power off your system."
-
-  if [[ $LTS -eq 1 ]] && [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
-     print_warning "After booting into the installed system, enter the following commands into the terminal to manually load the Virtualbox modules for the LTS kernel. This need only be done ONCE:"
-     echo " $ su"
-     echo " # depmod -a"
-     echo " # modprobe -a vboxvideo vboxguest vboxsf"
-     echo " # reboot" 
-     echo
-  fi
-
-  pause_function
-  exit 0
-}
-#}}}
-
-# Modified by Carl Duff. Removed original check_connection option as new one implemented.
-print_title "Evo/Lution-AIS Arch Installer v0.2"
-check_boot_system
-echo
-print_info "Checking installer has been run as root, and that there is an active internet connection. Please wait..."
-check_evo_requirements
-print_info "${Green}All checks passed"
-pacman -Sy
-echo
-print_warning "Please maximise this window for best results"
-echo
-echo "Lution-AIS is based on the AIS and AUI scripts written by Helmuth Saatkamp."
-echo
-pause_function
-mainmenu() {
-while true
-do
-  print_title "Evo/Lution-AIS Arch Installer v0.2: MAIN MENU"
-  print_warning "Each step can be repeated, but must be followed IN ORDER."
- echo "${BCyan}Base Installation${Reset}"
-  echo " 1) $(mainmenu_item "${checklist[1]}" "Configure Desktop Keyboard layout")"
-  echo " 2) $(mainmenu_item "${checklist[2]}" "Configure Mirrorlist (optional)")"
-  echo " 3) $(mainmenu_item "${checklist[3]}" "Partition Disk")"
-  echo " 4) $(mainmenu_item "${checklist[4]}" "Install Base System")"
-  echo " 5) $(mainmenu_item "${checklist[5]}" "Configure Fstab")"
-  echo " 6) $(mainmenu_item "${checklist[6]}" "Configure Hostname")"
-  echo " 7) $(mainmenu_item "${checklist[7]}" "Configure Timezone and Hardware Clock")"
-  echo " 8) $(mainmenu_item "${checklist[8]}" "Configure Virtual Console Keyboard Layout and System Locale")"
-  echo " 9) $(mainmenu_item "${checklist[9]}" "Run Mkinitcpio")"
-  echo "10) $(mainmenu_item "${checklist[10]}" "Install Bootloader")"
-  echo "11) $(mainmenu_item "${checklist[11]}" "Configure Root Password")"
-  echo "12) $(mainmenu_item "${checklist[12]}" "Configure User Account(s)")"
-  echo
-  echo "${BCyan}Desktop Installation${Reset}"
-  echo "13) $(mainmenu_item "${checklist[13]}" "Install ALSA, Xorg, Xf86-input, and Graphics Card Driver(s)")"
-  echo "14) $(mainmenu_item "${checklist[14]}" "Install Desktop Environment(s)")"
-  echo "15) $(mainmenu_item "${checklist[15]}" "Install Network Connection Manager")"  
-  echo "16) $(mainmenu_item "${checklist[16]}" "Install Display Manager (semi-automated)")"  
-  echo ""
-  echo " d) Done"
-  echo ""
-  read_input_options
-  for OPT in ${OPTIONS[@]}; do
-    case "$OPT" in
-      1)
-        select_keymap_xkb
-        checklist[1]=1
-        ;;
-      2)
-        configure_mirrorlist
-        checklist[2]=1
-        ;;
-      3)
-        umount_partitions
-        create_partition_scheme
-        format_partitions
-        checklist[3]=1
-        ;;
-      4)
-        install_base_system
-        checklist[4]=1
-        ;;
-      5)
-        configure_fstab
-        checklist[5]=1
-        ;;
-      6)
-        configure_hostname
-        checklist[6]=1
-        ;;
-      7)
-        configure_timezone
-        configure_hardwareclock
-        checklist[7]=1
-        ;;
-      8)
-        configure_keymap
-        configure_locale
-        checklist[8]=1
-        ;;
-      9)
-        configure_mkinitcpio
-        checklist[9]=1
-        ;;
-      10)
-        install_bootloader
-        configure_bootloader
-        checklist[10]=1
-        ;;
-      11)
-        root_password
-        checklist[11]=1
-        ;;
-      12)
-        create_new_user
-        checklist[12]=1
-        ;; 
-       13)
-        install_alsa_xorg_input
-        install_graphics_card_driver
-        checklist[13]=1
-        ;;     
-       14)
-         install_de_wm         
-
-         if [[ $COMMON_INSTALLED -eq 0 ]]; then
-            install_common
+         else 
+               dialog --backtitle "$VERSION" --title " Choose Display Manager " \
+               --menu $"\nPlease choose between LXDM or LightDM. LXDM is recommended for beginners.\n" 11 45 2 \
+ 	           "1" $"LXDM" \
+	           "2" $"LightDM" 2>${ANSWER}	
+	
+	          case $(cat ${ANSWER}) in
+              "1") # LXDM
+                   clear
+                   pacstrap ${MOUNTPOINT} lxdm
+                   arch_chroot "systemctl enable lxdm.service" 
+                ;;
+              "2") # LIGHTDM
+                   clear
+                   pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
+                   arch_chroot "systemctl enable lightdm.service"
+                ;;
+                *) install_desktop_menu
+                ;;
+              esac 
          fi
          
-         checklist[14]=1
-        ;;
-       15) 
-          setup_network_manager
-          checklist[15]=1
-        ;;        
-       16)
-         install_dm
-         checklist[16]=1
-        ;;
-      "d")
-        finish
-        ;;
-      *)
-        mainmenu
-        ;;
-    esac
-  done
-done
+         # Ensure DM option can only be run once.
+         DM_INSTALLED=1
+         
+   # if A display manager has already been installed and enabled (DM_INSTALLED=1), show a message instead.
+   else  
+         dialog --backtitle "$VERSION" --title " Display Manager Installed " --msgbox "\nA display manager has already been installed and enabled." 9 35
+   fi       
+
 }
-mainmenu
-#}}}
+
+install_nm() {
+
+   if [[ $NM_INSTALLED -eq 0 ]]; then
+      dialog --backtitle "$VERSION" --title " Choose Network Manager " \
+      --menu $"\nNetwork Manager is recommended, especially for wireless and PPPoE/DSL connections.\n" 14 45 4 \
+ 	  "1" $"Connman (command line)" \
+	  "2" $"dhcpcd  (command line)" \
+	  "3" $"Network Manager (graphical)" \
+	  "4" $"WICD (graphical)" 2>${ANSWER}	
+	
+	  case $(cat ${ANSWER}) in
+      "1") # connman
+           clear
+           pacstrap ${MOUNTPOINT} connman 
+           arch_chroot "systemctl enable connman.service" 
+           ;;
+      "2") # dhcpcd
+           clear
+           arch_chroot "systemctl enable dhcpcd.service"
+           ;;
+      "3") # Network Manager
+           clear
+           pacstrap ${MOUNTPOINT} networkmanager network-manager-applet rp-pppoe
+           arch_chroot "systemctl enable NetworkManager.service && systemctl enable NetworkManager-dispatcher.service"
+           ;;
+      "4") # WICD
+           clear
+           pacstrap ${MOUNTPOINT} wicd-gtk
+           arch_chroot "systemctl enable wicd.service"
+           ;;
+        *) install_desktop_menu
+           ;;
+      esac   
+      NM_INSTALLED=1
+   
+   else
+      dialog --backtitle "$VERSION" --title " Network Manager Installed " --msgbox "\nA network connection manager has already been installed and enabled." 9 35
+   fi
+}
+
+
+test() {
+	
+	
+	     dialog --backtitle "$VERSION - $SYSTEM" --title " Wireless Device Detected " --infobox "\nInstalling supplementary wireless packages..." 7 40 
+     sleep 3
+	
+	
+	#ping -c 3 google.com > /tmp/.outfile &
+    #dialog --title "checking" --no-kill --tailboxbg /tmp/.outfile 20 60 
+
+}
+	
+
+
+######################################################################
+##																	##
+##                 Main Interfaces       							##
+##																	##
+######################################################################
+
+# Greet the user when first starting the installer
+greeting() {
+id_system
+dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Welcome to $VERSION " --yesno "\nHighlight options by pressing their numbers or by using the up/down arrow keys before pressing [enter] to confirm.\n\nSwitch between buttons by using [Tab] or the left/right arrow keys before pressing [enter] to confirm.\n\nA mouse/touchpad may also be used.\n\nA TUITION MODE is also availble for beginners, which will explain each step and make recommendations in more detail. Activate tuition mode?" 0 0 && TUITION_MODE=1	
+
+}
+
+# Preparation
+prep_menu() {
+   dialog --backtitle "$VERSION" --title " Prepare Installation " \
+    --menu $"" 10 50 4 \
+ 	"1" $"Set Desktop Keyboard Layout" \
+	"2" $"Configure Installer Mirrorlist (optional)" \
+	"3" $"Partition Disk" \
+	"4" $"Mount Partitions" 2>${ANSWER}
+
+	case $(cat ${ANSWER}) in
+        "1") set_xkbmap 
+             ;;
+        "2") configure_mirrorlist
+             ;;
+        "3") umount_partitions
+             select_device
+             create_partitions
+             ;;
+        "4") mount_partitions
+             ;;        
+          *) main_menu_online
+             ;;
+    esac
+    
+    prep_menu  	
+	
+}
+
+# Base Installation
+install_base_menu() {
+   dialog --backtitle "$VERSION" --title " Install Base " \
+    --menu $"" 8 40 2 \
+ 	"1" $"Install Base" \
+	"2" $"Install Bootloader" 2>${ANSWER}	
+	
+	case $(cat ${ANSWER}) in
+        "1") install_base 
+             ;;
+        "2") install_bootloader
+             ;;
+          *) main_menu_online
+             ;;
+    esac
+    
+    install_base_menu 	
+}
+
+# Base Configuration
+config_base_menu() {
+    dialog --backtitle "$VERSION" --title " Configure Base" \
+    --menu $"" 12 50 6 \
+ 	"1" $"Generate FSTAB" \
+	"2" $"Set Hostname" \
+	"3" $"Set Timezone" \
+	"4" $"Set Hardware Clock" \
+	"5" $"Set System Locale" \
+	"6" $"Set Virtual Console" 2>${ANSWER}	
+	
+	case $(cat ${ANSWER}) in
+        "1") generate_fstab 
+             ;;
+        "2") set_hostname
+             ;;
+        "3") set_timezone
+             ;;
+        "4") set_hw_clock
+             ;;            
+        "5") set_locale
+             ;;
+        "6") set_keymap
+             ;;            
+          *) main_menu_online
+             ;;
+    esac
+    
+    config_base_menu
+
+}
+
+# Root and User Configuration
+config_user_menu() {	
+    dialog --backtitle "$VERSION" --title " Configure User(s)" \
+    --menu $"" 8 50 2 \
+ 	"1" $"Set Root Pasword" \
+	"2" $"Add New User(s)" 2>${ANSWER}
+	
+		case $(cat ${ANSWER}) in
+        "1") set_root_password 
+             ;;
+        "2") create_new_user
+             ;;     
+          *) main_menu_online
+             ;;
+    esac
+    
+    config_user_menu
+}
+
+
+install_desktop_menu() {
+	
+    dialog --backtitle "$VERSION" --title " Install Desktop " \
+    --menu $"" 10 55 4 \
+ 	"1" $"Install Graphics, Input, and Sound Drivers" \
+	"2" $"Install Desktop Environment(s)" \
+	"3" $"Install Network Management" \
+	"4" $"Install Display Manager" 2>${ANSWER}
+	
+	case $(cat ${ANSWER}) in
+        "1") install_alsa_xorg_input
+             setup_graphics_card 
+             ;;
+        "2") install_de_wm
+             ;;
+        "3") install_nm
+             ;;
+        "4") install_dm
+             ;;            
+          *) main_menu_online
+             ;;
+    esac
+    
+    install_desktop_menu
+	
+}
+
+main_menu_online() {
+    dialog --backtitle "$VERSION" --title " Main Menu - Online Mode " \
+    --menu $"\nEach step can be repeated, but must be followed IN ORDER.Once complete, select Done\n" 17 50 7 \
+ 	"1" $"Prepare Installation" \
+	"2" $"Install Base" \
+	"3" $"Configure Base" \
+	"4" $"Configure User Account(s)" \
+	"5" $"Install Desktop(s)" \
+    "6" $"Run Mkinitcpio" \
+	"7" $"Done" 2>${ANSWER}
+
+   case $(cat ${ANSWER}) in
+        "1") prep_menu 
+             ;;
+        "2") install_base_menu
+             ;;
+        "3") config_base_menu
+             ;;
+        "4") config_user_menu
+             ;;            
+        "5") install_desktop_menu
+             ;;
+        "6") run_mkinitcpio
+             ;;            
+          *) (dialog --yesno $"Close installer?" 0 0) && umount_partitions && exit 0 || main_menu_online
+             ;;
+    esac
+    main_menu_online 
+
+}
+
+# Not used yet.
+mode_menu() {
+
+   dialog --backtitle "$VERSION" --title " Installation Mode " \
+    --menu $"\nOn-line: Install the latest packages from the Arch repositories to build a custom system.\nInternet connection required.\n\nOff-line: Install Evo from this ISO.\nNo internet connection required.\n" 15 50 2 \
+ 	"1" $"On-line  Mode" \
+	"2" $"Off-line Mode" 2>${ANSWER}
+	MODE=$(cat ${ANSWER})
+	
+	while true; do
+      if   [[ $MODE == "1" ]]; then
+           main_menu_online
+      elif [[ $MODE == "2" ]]; then
+           dialog --msgbox $"This option is not available yet" 6 50 && mode_menu
+      else         
+          (dialog --yesno $"Close installer?" 0 0) && exit 0 || mode_menu
+      fi         
+     done
+	
+}
+
+######################################################################
+##																	##
+##                        Execution     							##
+##																	##
+######################################################################
+
+check_evo_requirements
+id_system
+greeting
+
+	while true; do
+          main_menu_online      
+    done
