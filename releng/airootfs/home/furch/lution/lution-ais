@@ -53,6 +53,7 @@ VERSION="Lution-AIS 0.3"
   ROOT_PART=""          # ROOT partition
   UEFI_PART=""          # UEFI partition
   INST_DEV=""           # Device where system has been installed
+  FS=""                 # File System Type for Mounting
 
 # Installation
   MOUNTPOINT="/mnt"
@@ -186,6 +187,7 @@ set_keymap() {
     --menu "\nUse the [pg up] and [pg dwn] keys for navigation, or press the first letter of the keymap if known." 20 40 16 ${KEYMAPS} 2>${ANSWER} || config_base_menu
     KEYMAP=$(cat ${ANSWER})
     echo "KEYMAP=$KEYMAP" > ${MOUNTPOINT}/etc/vconsole.conf
+    
   }
 
 # Set keymap for X11
@@ -200,6 +202,7 @@ set_keymap() {
 	
     dialog --backtitle "$VERSION" --title " Select xkbmap " --menu "Select Keyboard Layout" 20 45 16 ${XKBMAP_LIST} 2>${ANSWER} || prep_menu
     XKBMAP=$(cat ${ANSWER} |sed 's/_.*//')
+    echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${XKBMAP}"\"\nEndSection" > /tmp/00-keyboard.conf
     setxkbmap $XKBMAP
  
 }
@@ -527,17 +530,25 @@ mount_partitions() {
     confirm_mount ${MOUNTPOINT}
 	
 	# Identify and create swap, if applicable
-    dialog --backtitle "$VERSION" --title " Select SWAP Partition " --menu "\n." 12 40 4 ${PARTITIONS} $"none" $"-" 2>${ANSWER} || config_base_menu  
-    if [[ $(cat ${ANSWER}) != "none" ]]; then
-    
+    dialog --backtitle "$VERSION" --title " Select SWAP Partition " --menu "\n." 12 40 4 ${PARTITIONS} $"Swapfile" $"-" $"none" $"-" 2>${ANSWER} || config_base_menu  
+    if [[ $(cat ${ANSWER}) != "none" ]]; then    
        PARTITION=$(cat ${ANSWER})
        
-       #swapoff $"/dev/"${PARTITION}
-       mkswap  $"/dev/"${PARTITION} >/dev/null 2>&1
-       swapon  $"/dev/"${PARTITION} >/dev/null 2>&1
+       if [[ $PARTITION == "Swapfile" ]]; then
+          total_memory=`grep MemTotal /proc/meminfo | awk '{print $2/1024}' | sed 's/\..*//'`
+          fallocate -l ${total_memory}M ${MOUNTPOINT}/swapfile
+          chmod 600 ${MOUNTPOINT}/swapfile
+          mkswap ${MOUNTPOINT}/swapfile
+          swapon ${MOUNTPOINT}/swapfile
+       else
        
-       PARTITIONS="$(echo $PARTITIONS | sed s/${PARTITION}$' -'//)"
-       NUMBER_PARTITIONS=$(( NUMBER_PARTITIONS - 1 ))
+          #swapoff $"/dev/"${PARTITION}
+          mkswap  $"/dev/"${PARTITION} >/dev/null 2>&1
+          swapon  $"/dev/"${PARTITION} >/dev/null 2>&1
+       
+          PARTITIONS="$(echo $PARTITIONS | sed s/${PARTITION}$' -'//)"
+          NUMBER_PARTITIONS=$(( NUMBER_PARTITIONS - 1 ))
+       fi
     fi
     
     ## Extra Step for VFAT UEFI Partition
@@ -652,8 +663,7 @@ install_base() {
 # Adapted from AIS. Integrated the configuration elements, and for UEFI systems, fixed the 
 # gummiboot installation, dropped syslinux and replaced it with rEFInd.
 install_bootloader() {
-	
-# FIX SYSLINUX
+
 bios_bootloader() {
    dialog --backtitle "$VERSION" --title " Install Bootloader (BIOS) " \
     --menu $"\nGrub2 is recommended for beginners as the most popular and versatile option.\n\nSyslinux is a lighter and simpler alternative, usually used by Linux installation ISOs." 14 50 2 \
@@ -728,13 +738,13 @@ uefi_bootloader() {
 }
 
 # Install alsa, xorg and input drivers
-# Also use the xkbmap set earlier to create a keyboard configuration file for the installed system
+# Also copy the xkbmap configuration file created earlier to the installed system
 install_alsa_xorg_input() {
 
   dialog --backtitle "$VERSION" --title " ALSA, Xorg, and Input " --msgbox "\nBefore installing graphics card driver(s) or desktop environments, other packages are needed first:\n\nalsa - Advanced Linux Sound Architecture\nxorg-* - open-source X window system for graphics\nxf86-input-* - open-source drivers for input devices" 12 60
   clear	
   pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard xf86-input-vmmouse
-  echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${XKBMAP}"\"\nEndSection" > ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
+  cp /tmp/00-keyboard.conf ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
 
 }
 
@@ -1109,7 +1119,7 @@ test() {
 # Greet the user when first starting the installer
 greeting() {
 id_system
-dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Welcome to $VERSION " --yesno "\nHighlight options by pressing their numbers or by using the up/down arrow keys before pressing [enter] to confirm.\n\nSwitch between buttons by using [Tab] or the left/right arrow keys before pressing [enter] to confirm.\n\nA mouse/touchpad may also be used.\n\nA TUITION MODE is also availble for beginners, which will explain each step and make recommendations in more detail. Activate tuition mode?" 0 0 && TUITION_MODE=1	
+dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Welcome to $VERSION " --msgbox "\nHighlight options by pressing their numbers or by using the up/down arrow keys before pressing [enter] to confirm.\n\nSwitch between buttons by using [Tab] or the left/right arrow keys before pressing [enter] to confirm.\n\nA mouse/touchpad may also be used.\n" 0 0	
 
 }
 
