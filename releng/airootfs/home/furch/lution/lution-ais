@@ -638,13 +638,16 @@ install_base() {
              pacstrap ${MOUNTPOINT} base btrfs-progs ntp sudo 
              ;;
         "2") # Latest Kernel and base-devel
+             clear
              pacstrap ${MOUNTPOINT} base base-devel btrfs-progs ntp sudo
              ;;
         "3") # LTS Kernel
+             clear
              pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs btrfs-progs ntp sudo
              LTS=1
              ;;
         "4") # LTS Kernel and base-devel
+             clear
              pacstrap ${MOUNTPOINT} bash bzip2 coreutils cryptsetup device-mapper dhcpcd diffutils e2fsprogs file filesystem findutils gawk gcc-libs gettext glibc grep gzip inetutils iproute2 iputils jfsutils less licenses linux-lts logrotate lvm2 man-db man-pages mdadm nano netctl pacman pciutils pcmciautils perl procps-ng psmisc reiserfsprogs s-nail sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux vi which xfsprogs base-devel btrfs-progs ntp sudo
              LTS=1
              ;;
@@ -700,7 +703,7 @@ uefi_bootloader() {
 	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
      
     dialog --backtitle "$VERSION" --title " Install Bootloader (UEFI) " \
-    --menu $"\nGrub2 is recommended for beginners as the most popular and versatile option.\n\nGummiboot is a popular choice for UEFI systems, and recommends mounting the UEFI partition at /boot.\n\nrEFInd is a simple and fully automated alternative." 17 55 3 \
+    --menu $"\nGummiboot is recommended for beginners, although the UEFI partition should be mounted at /boot.\n\nrEFInd is a simple and fully automated alternative." 17 55 3 \
  	"1" $"Install Grub2" \
 	"2" $"Install Gummiboot" \
 	"3" $"Install rEFInd" 2>${ANSWER}	
@@ -708,11 +711,12 @@ uefi_bootloader() {
         "1") clear
              pacstrap ${MOUNTPOINT} grub os-prober
              arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_PART} --bootloader-id=arch_grub --recheck"
+             arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
              ;;
         "2") clear
              pacstrap ${MOUNTPOINT} gummiboot
              arch_chroot "gummiboot --path=${UEFI_PART} install"
-             partuuid=`blkid -s PARTUUID ${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
+             partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
              echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
              echo -e "default  arch\ntimeout  4" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
              dialog --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files.\n" 8 40
@@ -759,14 +763,14 @@ setup_graphics_card() {
 gc_driver_menu() {
 
    dialog --backtitle "$VERSION" --title " Graphics Card Menu " \
-    --menu $"\nIf you are unsure - or your card is not listed - pick 'Unknown / All', which will install all listed drivers. At least one of them worked to boot Evo!\n" 17 50 7 \
+    --menu $"\nIf you are unsure - or your card is not listed - pick 'Unknown / Generic', which will install a generic, catch-all driver.\n" 17 50 7 \
  	"1" $"AMD/ATI" \
 	"2" $"Intel" \
 	"3" $"NVIDIA" \
 	"4" $"Via" \
 	"5" $"VirtualBox" \
     "6" $"VMWare" \
-	"7" $"Unknown / All" 2>${ANSWER}
+	"7" $"Unknown / Generic" 2>${ANSWER}
 
    case $(cat ${ANSWER}) in
         "1") GC_DETECTED="ATI"
@@ -781,7 +785,7 @@ gc_driver_menu() {
              ;;
         "6") GC_DETECTED="VMware"
              ;;
-        "7") GC_DETECTED="all"
+        "7") GC_DETECTED="Generic"
              ;;
           *) install_desktop_menu
              ;;
@@ -789,7 +793,7 @@ gc_driver_menu() {
     install_gc
 }
 
-# Adapted from Anterogos' CLI installer (2.0)
+# Adapted from Anterogos' CLI installer
 detect_graphics_card() {
 	
     if   [[ `echo ${GRAPHIC_CARD}|grep -i 'ati[[:space:]]'` != "" ]]; then
@@ -836,8 +840,8 @@ install_gc() {
       pacstrap ${MOUNTPOINT} xf86-video-vmware mesa-libgl mesa
  elif [[ $GC_DETECTED == "Via" ]]; then
       pacstrap ${MOUNTPOINT} xf86-video-openchrome
- elif [[ $GC_DETECTED == "all" ]]; then 
-      pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri xf86-video-nouveau nouveau-dri xf86-video-intel intel-dri xf86-video-fbdev xf86-video-vmware xf86-video-openchrome mesa-libgl mesa      
+ elif [[ $GC_DETECTED == "Generic" ]]; then 
+      pacstrap ${MOUNTPOINT} xf86-video-modesetting mesa-libgl mesa      
  else
       gc_driver_menu  
  fi
@@ -1100,11 +1104,6 @@ install_nm() {
 
 
 test() {
-	
-	
-	     dialog --backtitle "$VERSION - $SYSTEM" --title " Wireless Device Detected " --infobox "\nInstalling supplementary wireless packages..." 7 40 
-     sleep 3
-	
 	
 	#ping -c 3 google.com > /tmp/.outfile &
     #dialog --title "checking" --no-kill --tailboxbg /tmp/.outfile 20 60 
