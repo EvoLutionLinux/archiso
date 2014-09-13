@@ -53,7 +53,9 @@ VERSION="Lution-AIS 0.3"
   ROOT_PART=""          # ROOT partition
   UEFI_PART=""          # UEFI partition
   INST_DEV=""           # Device where system has been installed
-  #SWAPFILE=""           # Swapfile used?
+  HIGHLIGHT=0           # Highlight items for Main Menu
+  HIGHLIGHT_SUB=0	    # Highlight items for submenu
+  SUB_MENU=""           # Submenu to be highlighted
 
 # Installation
   MOUNTPOINT="/mnt"
@@ -133,13 +135,13 @@ configure_mirrorlist() {
 mirror_by_country() {
 
  COUNTRY_LIST=""
- countries_list=("AU_Australia AT_Austria BY_Belarus BE_Belgium BR_Brazil BG_Bulgaria CA_Canada CL_Chile CN_China CO_Colombia CZ_Czech_Republic DK_Denmark EE_Estonia FI_Finland FR_France DE_Germany GR_Greece HU_Hungary IN_India IE_Ireland IL_Israel IT_Italy JP_Japan KZ_Kazakhstan KR_Korea LV_Latvia LU_Luxembourg MK_Macedonia NL_Netherlands NC_New_Caledonia NZ_New_Zealand NO_Norway PL_Poland PT_Portugal RO_Romania RU_Russia RS_Serbia SG_Singapore SK_Slovakia ZA_South_Africa ES_Spain LK_Sri_Lanka SE_Sweden CH_Switzerland TW_Taiwan TR_Turkey UA_Ukraine GB_United_Kingdom US_United_States UZ_Uzbekistan VN_Vietnam")
+ countries_list=("AU_Australia AT_Austria BY_Belarus BE_Belgium BR_Brazil BG_Bulgaria CA_Canada CL_Chile CN_China CO_Colombia CZ_Czech_Republic DK_Denmark EE_Estonia FI_Finland FR_France DE_Germany GB_United_Kingdom GR_Greece HU_Hungary IN_India IE_Ireland IL_Israel IT_Italy JP_Japan KZ_Kazakhstan KR_Korea LV_Latvia LU_Luxembourg MK_Macedonia NL_Netherlands NC_New_Caledonia NZ_New_Zealand NO_Norway PL_Poland PT_Portugal RO_Romania RU_Russia RS_Serbia SG_Singapore SK_Slovakia ZA_South_Africa ES_Spain LK_Sri_Lanka SE_Sweden CH_Switzerland TW_Taiwan TR_Turkey UA_Ukraine US_United_States UZ_Uzbekistan VN_Vietnam")
 
  for i in ${countries_list}; do
      COUNTRY_LIST="${COUNTRY_LIST} ${i} -"
  done
 	
- dialog --backtitle "$VERSION" --title " Select Country " --menu "\nA list of mirrors by the selected country will be generated.\n\nOnce reviewed, you can choose to use it or not." 20 45 16 ${COUNTRY_LIST} 2>${ANSWER} || prep_menu
+ dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Country " --menu "\nA list of mirrors by the selected country will be generated.\n\nOnce reviewed, you can choose to use it or not." 20 45 16 ${COUNTRY_LIST} 2>${ANSWER} || prep_menu
  COUNTRY_CODE=$(cat ${ANSWER} |sed 's/_.*//')
 
  URL="https://www.archlinux.org/mirrorlist/?country=${COUNTRY_CODE}&use_mirror_status=on"
@@ -183,7 +185,7 @@ set_keymap() {
         KEYMAPS="${KEYMAPS} ${i} -"
     done
     
-    dialog --backtitle "$VERSION" --title " Select Keymap " \
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Keymap " \
     --menu "\nUse the [pg up] and [pg dwn] keys for navigation, or press the first letter of the keymap if known." 20 40 16 ${KEYMAPS} 2>${ANSWER} || config_base_menu
     KEYMAP=$(cat ${ANSWER})
     echo "KEYMAP=$KEYMAP" > ${MOUNTPOINT}/etc/vconsole.conf
@@ -200,7 +202,7 @@ set_keymap() {
         XKBMAP_LIST="${XKBMAP_LIST} ${i} -"
     done
 	
-    dialog --backtitle "$VERSION" --title " Select xkbmap " --menu "Select Keyboard Layout" 20 45 16 ${XKBMAP_LIST} 2>${ANSWER} || prep_menu
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select xkbmap " --menu "Select Keyboard Layout" 20 45 16 ${XKBMAP_LIST} 2>${ANSWER} || prep_menu
     XKBMAP=$(cat ${ANSWER} |sed 's/_.*//')
     echo -e "Section "\"InputClass"\"\nIdentifier "\"system-keyboard"\"\nMatchIsKeyboard "\"on"\"\nOption "\"XkbLayout"\" "\"${XKBMAP}"\"\nEndSection" > /tmp/00-keyboard.conf
     setxkbmap $XKBMAP
@@ -215,7 +217,7 @@ set_locale() {
       LOCALES="${LOCALES} ${i} -"
   done
 
-  dialog --backtitle "$VERSION" --title " Select locale " --menu "Select A Locale" 22 30 16 ${LOCALES} 2>${ANSWER} || config_base_menu 
+  dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select locale " --menu "Select A Locale" 22 30 16 ${LOCALES} 2>${ANSWER} || config_base_menu 
   LOCALE=$(cat ${ANSWER})
   
   echo 'LANG="'$LOCALE'"' > ${MOUNTPOINT}/etc/locale.conf  
@@ -231,7 +233,7 @@ set_timezone() {
       ZONE="$ZONE ${i} -"
     done
     
-     dialog --backtitle "$VERSION" --title " Select Time Zone " --menu "\n." 20 40 12 ${ZONE} 2>${ANSWER} || config_base_menu
+     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Time Zone " --menu "\nThe time zone is used to correctly set your system clock." 19 40 11 ${ZONE} 2>${ANSWER} || config_base_menu
      ZONE=$(cat ${ANSWER}) 
     
      SUBZONE=""
@@ -239,17 +241,17 @@ set_timezone() {
         SUBZONE="$SUBZONE ${i} -"
      done
          
-     dialog --backtitle "$VERSION" --title " Select Time Sub-Zone " --menu "\n." 20 40 12 ${SUBZONE} 2>${ANSWER} || config_base_menu
+     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Time Sub-Zone " --menu "\nSelect the city nearest to you." 19 40 11 ${SUBZONE} 2>${ANSWER} || config_base_menu
      SUBZONE=$(cat ${ANSWER}) 
     
-     dialog --yesno $"Set Time Zone as ${ZONE}/${SUBZONE} ?" 0 0 && arch_chroot "ln -s /usr/share/zoneinfo/${ZONE}/${SUBZONE} /etc/localtime" || config_base_menu
+     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --yesno $"Set Time Zone as ${ZONE}/${SUBZONE} ?" 0 0 && arch_chroot "ln -s /usr/share/zoneinfo/${ZONE}/${SUBZONE} /etc/localtime" || config_base_menu
     
 }
 
 set_hw_clock() {
 	
-   dialog --backtitle "$VERSION" --title " Set Hardware Clock " \
-    --menu $"" 9 50 3 \
+   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set Hardware Clock " \
+    --menu $"\nUTC is the universal time standard, and is recommended unless dual-booting with Windows." 12 45 2 \
  	"1" $"UTC" \
 	"2" $"Local Time" 2>${ANSWER}	
 
@@ -296,7 +298,7 @@ generate_fstab() {
 # Adapted from AIS.
 set_hostname() {
 
-   dialog --backtitle "$VERSION" --title " Configure Host Name " --inputbox "\nThe host name is used to identify the system on a network.\n\nIt is restricted to alphanumeric characters, can contain a hyphen (-) - but not at the start or end - and must be no longer than 63 characters.\n" 12 65 "evo" 2>${ANSWER} || config_base_menu
+   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Configure Host Name " --inputbox "\nThe host name is used to identify the system on a network.\n\nIt is restricted to alphanumeric characters, can contain a hyphen (-) - but not at the start or end - and must be no longer than 63 characters.\n" 12 65 "evo" 2>${ANSWER} || config_base_menu
    HOST_NAME=$(cat ${ANSWER})
 
    echo "$HOST_NAME" > ${MOUNTPOINT}/etc/hostname
@@ -308,10 +310,10 @@ set_hostname() {
 set_root_password() {
 
 
-    dialog --title " Set Root Password " --clear --insecure --passwordbox "\nEnter Root password\n\n" 10 55 2> ${ANSWER}
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set Root Password " --clear --insecure --passwordbox "\nEnter Root password\n\n" 10 55 2> ${ANSWER} || config_user_menu
     PASSWD=$(cat ${ANSWER})
     
-    dialog --title " Set Root Password " --clear --insecure --passwordbox "\nRe-enter Root password\n\n" 10 55 2> ${ANSWER}
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set Root Password " --clear --insecure --passwordbox "\nRe-enter Root password\n\n" 10 55 2> ${ANSWER} || config_user_menu
     PASSWD2=$(cat ${ANSWER})
     
     if [[ $PASSWD == $PASSWD2 ]]; then 
@@ -319,7 +321,7 @@ set_root_password() {
        arch_chroot "passwd root" < /tmp/.passwd
        rm /tmp/.passwd
     else
-       dialog --backtitle "$VERSION" --title " Root Password Error " --msgbox $"\nThe Root passwords entered do not match. Please try again.\n" 8 35
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Root Password Error " --msgbox $"\nThe Root passwords entered do not match. Please try again.\n" 8 35
        set_root_password
     fi
 
@@ -328,31 +330,29 @@ set_root_password() {
 # Adapted and simplified from the Antergos 2.0 installer
 create_new_user() {
 
-        dialog --backtitle "$VERSION" --title " Create New User " --inputbox "\nEnter the user name.\n\nIt is recommended to use all lower-case letters.\n" 11 55 "" 2>${ANSWER} || config_base_menu
+        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Create New User " --inputbox "\nEnter the user name.\n\nIt is recommended to use all lower-case letters.\n" 11 55 "" 2>${ANSWER} || config_user_menu
         USER=$(cat ${ANSWER})
         
         if [[ $USER == "" ]]; then
-           dialog --backtitle "$VERSION" --title " User Name Error " --msgbox $"\nNo user name was entered. Please try again.\n" 8 35
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " User Name Error " --msgbox $"\nNo user name was entered. Please try again.\n" 8 35
            create_new_user
         else
-           dialog --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 10 55 2> ${ANSWER}
+           dialog --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
            PASSWD=$(cat ${ANSWER}) 
     
-           dialog --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 10 55 2> ${ANSWER}
+           dialog --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
            PASSWD2=$(cat ${ANSWER}) 
     
            if [[ $PASSWD == $PASSWD2 ]]; then         
-              dialog --backtitle "$VERSION" --title " Setting User " --infobox "\nCreating User and setting groups...\n" 6 40
+              dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Setting User " --infobox "\nCreating User and setting groups...\n" 6 40
               sleep 2
               arch_chroot "useradd ${USER} -m -g users -G wheel,storage,power,network,video,audio,lp -s /bin/bash"
               echo -e "${PASSWD}\n${PASSWD}" > /tmp/.passwd
               arch_chroot "passwd ${USER}" < /tmp/.passwd
               rm /tmp/.passwd
-             # arch_chroot "cp /etc/skel/.bashrc /home/${USER}"
-             # arch_chroot "chown -R ${USER}:users /home/${USER}"
               arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
            else
-              dialog --backtitle "$VERSION" --title " User Password Error " --msgbox $"\nThe User passwords entered do not match. Please try again.\n" 8 35
+              dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " User Password Error " --msgbox $"\nThe User passwords entered do not match. Please try again.\n" 8 35
               create_new_user
            fi
          fi
@@ -389,14 +389,14 @@ umount_partitions(){
 # Adapted from AIS
 confirm_mount() {
     if mount | grep $1; then
-      dialog --backtitle "$VERSION" --title " Mount Status " --infobox "\nMount Successful!\n" 5 30
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Mount Status " --infobox "\nMount Successful!\n" 5 30
       sleep 2
       PARTITIONS="$(echo $PARTITIONS | sed s/${PARTITION}$' -'//)"
       NUMBER_PARTITIONS=$(( NUMBER_PARTITIONS - 1 ))
     else
       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Mount Status " --infobox "Mount Failed!" 5 30
       sleep 2
-      config_base_menu
+      prep_menu
     fi
 }
 
@@ -412,7 +412,7 @@ select_device() {
         DEVICE="${DEVICE} ${i} -"
     done
     
-    dialog --backtitle "$VERSION" --title " Select Device " --menu "\n." 10 40 3 ${DEVICE} 2>${ANSWER} || prep_menu
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Device " --menu "\n." 10 40 3 ${DEVICE} 2>${ANSWER} || prep_menu
     DEVICE=$(cat ${ANSWER}) 
   }
 
@@ -440,8 +440,7 @@ create_partitions(){
 # find all available partitions and generate a list of them
 # This also includes partitions on different devices.
 find_partitions() {
-	
-	
+
 	PARTITIONS=""
     partition_list=(`lsblk | grep 'part\|lvm' | awk '{print substr($1,3)}'`)
 	
@@ -464,49 +463,47 @@ find_partitions() {
     fi
 }
 
-# Not all filesystems available are viable, so set static list.
+# Set static list of filesystems rather than on-the-fly. Partially as most require additional flags, and partially because some don't seem
+# to be remotely viable choices.
 select_filesystem(){
-	
-	dialog --backtitle "$VERSION" --title " Choose Filesystem " \
-    --menu $"Ext4 is recommended for beginners." 19 30 11 \
- 	"1" $"SKIP" \
-	"2" $"btrfs" \
-	"3" $"ext2" \
- 	"4" $"ext3" \
-	"5" $"ext4" \
-	"6" $"jfs" \
- 	"7" $"nilfs2" \
-	"8" $"ntfs" \
-	"9" $"reiserfs" \
- 	"10" $"vfat" \
-	"11" $"xfs" 2>${ANSWER}		
+
+dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Choose Filesystem " \
+    --menu $"\nExt4 is recommended. Not all filesystems are viable for Root or Boot partitions. All have different features and limitations." 19 40 8 \
+ 	"1" $"Skip / None" \
+	"2" $"ext2" \
+ 	"3" $"ext3" \
+	"4" $"ext4" \
+	"5" $"jfs" \
+ 	"6" $"nilfs2" \
+	"7" $"ntfs" \
+	"8" $"reiserfs" \
+ 	"9" $"vfat" \
+	"10" $"xfs" 2>${ANSWER}	
 
     case $(cat ${ANSWER}) in
         "1") FILESYSTEM="skip"
              ;;
-        "2") FILESYSTEM="mkfs.btrfs -f"
+        "2") FILESYSTEM="mkfs.ext2 -F"
              ;;
-        "3") FILESYSTEM="mkfs.ext2 -F"
-             ;;
-        "4") FILESYSTEM="mkfs.ext3 -F"
+        "3") FILESYSTEM="mkfs.ext3 -F"
              ;;            
-        "5") FILESYSTEM="mkfs.ext4 -F"
+        "4") FILESYSTEM="mkfs.ext4 -F"
              ;;
-        "6") FILESYSTEM="mkfs.jfs -q"
+        "5") FILESYSTEM="mkfs.jfs -q"
              ;;
-        "7") FILESYSTEM="mkfs.nilfs2 -f"
+        "6") FILESYSTEM="mkfs.nilfs2 -f"
              ;;  
-        "8") FILESYSTEM="mkfs.ntfs -q"
+        "7") FILESYSTEM="mkfs.ntfs -q"
              ;;  
-        "9") FILESYSTEM="mkfs.reiserfs -f -f"
+        "8") FILESYSTEM="mkfs.reiserfs -f -f"
              ;;  
-       "10") FILESYSTEM="mkfs.vfat -F32"
+       "9") FILESYSTEM="mkfs.vfat -F32"
              ;;  
-       "11") FILESYSTEM="mkfs.xfs -f"
+       "10") FILESYSTEM="mkfs.xfs -f"
              ;;      
           *) prep_menu
              ;;
-    esac 	
+    esac
 
   }
   
@@ -517,7 +514,7 @@ mount_partitions() {
 	find_partitions
 	
 	# Identify and mount root
-	dialog --backtitle "$VERSION" --title " Select ROOT Partition " --menu "\n." 12 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu
+	dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select ROOT Partition " --menu "" 12 40 4 ${PARTITIONS} 2>${ANSWER} || prep_menu
 	PARTITION=$(cat ${ANSWER})
     ROOT_PART=${PARTITION}
 	INST_DEV=$"/dev/"$(cat ${ANSWER} | sed 's/[0-9]*//g')
@@ -532,42 +529,39 @@ mount_partitions() {
     confirm_mount ${MOUNTPOINT}
 	
 	# Identify and create swap, if applicable
-    dialog --backtitle "$VERSION" --title " Select SWAP Partition " --menu "\n." 12 40 4 ${PARTITIONS} $"Swapfile" $"-" $"none" $"-" 2>${ANSWER} || config_base_menu  
-    if [[ $(cat ${ANSWER}) != "none" ]]; then    
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select SWAP Partition " --menu "\n." 12 40 4 $"None" $"-" $"Swapfile" $"-" ${PARTITIONS} 2>${ANSWER} || prep_menu  
+    if [[ $(cat ${ANSWER}) != "None" ]]; then    
        PARTITION=$(cat ${ANSWER})
        
        if [[ $PARTITION == "Swapfile" ]]; then
-          #SWAPFILE=1
           total_memory=`grep MemTotal /proc/meminfo | awk '{print $2/1024}' | sed 's/\..*//'`
           fallocate -l ${total_memory}M ${MOUNTPOINT}/swapfile
           chmod 600 ${MOUNTPOINT}/swapfile
           mkswap ${MOUNTPOINT}/swapfile
           swapon ${MOUNTPOINT}/swapfile
        else
-       
-          #swapoff $"/dev/"${PARTITION}
           mkswap  $"/dev/"${PARTITION} >/dev/null 2>&1
           swapon  $"/dev/"${PARTITION} >/dev/null 2>&1
-       
+          # Since a partition was used, remove that partition from the list
           PARTITIONS="$(echo $PARTITIONS | sed s/${PARTITION}$' -'//)"
           NUMBER_PARTITIONS=$(( NUMBER_PARTITIONS - 1 ))
        fi
     fi
     
-    ## Extra Step for VFAT UEFI Partition
+    # Extra Step for VFAT UEFI Partition
     if [[ $UEFI -eq 1 ]]; then
     
-       dialog --backtitle "$VERSION" --title " Select UEFI Partition " --menu "\n." 12 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu  
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Partition " --menu "" 12 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu  
        PARTITION=$(cat ${ANSWER})
        
-       ## If there is already a fat/vfat partition...
+       # If there is already a fat/vfat partition...
        if [[ $(fsck -N /dev/$PARTITION | grep fat) ]]; then
-          dialog --backtitle "$VERSION" --title " UEFI Partition " --yesno $"The UEFI partition $PARTITION has already been formatted.\n\nReformat? Doing so will erase ALL data already on that partition." 0 0 && mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
+          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Partition " --yesno $"The UEFI partition $PARTITION has already been formatted.\n\nReformat? Doing so will erase ALL data already on that partition." 0 0 && mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
        else 
           mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
        fi   
        
-       dialog --backtitle "$VERSION" --title " Select UEFI Mountpoint " --menu $"\n/boot is recommended, especially if intending to use the Gummiboot bootloader." 12 40 2 \
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\n/boot is recommended, especially if intending to use the Gummiboot bootloader." 12 40 2 \
  	   "1" $"/boot" \
 	   "2" $"/boot/efi" 2>${ANSWER}	
        
@@ -586,12 +580,12 @@ mount_partitions() {
        
     fi
     
-    ## All other partitions
+    # All other partitions
        while [[ $NUMBER_PARTITIONS > 0 ]]; do 
-             dialog --backtitle "$VERSION" --title " Select Partition " --menu "\n." 12 40 4 ${PARTITIONS} $"done" $"-" 2>${ANSWER} || config_base_menu 
+             dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Partition " --menu "\n." 12 40 4 $"Done" $"-" ${PARTITIONS} 2>${ANSWER} || config_base_menu 
              PARTITION=$(cat ${ANSWER})
              
-             if [[ $PARTITION == "done" ]]; then
+             if [[ $PARTITION == "Done" ]]; then
                 break;
              else
                 MOUNT=""
@@ -601,7 +595,12 @@ mount_partitions() {
 	               ${FILESYSTEM} $"/dev/"${PARTITION} >/dev/null 2>&1
 	            fi
                 
-                dialog --backtitle "$VERSION" --title " Name Partition: $PARTITON " --inputbox "\nExamples include: /boot or /home.\n\nEnsure the name is preceeded by a forward slash (/)." 11 65 "/" 2>${ANSWER} || config_base_menu
+                # Don't give /boot as an example for UEFI systems!
+                if [[ $UEFI -eq 1 ]]; then
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Name Partition: $PARTITON " --inputbox "\nExamples include: /home or /var.\n\nEnsure the name is preceeded by a forward slash (/)." 11 65 "/" 2>${ANSWER} || config_base_menu
+                else
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Name Partition: $PARTITON " --inputbox "\nExamples include: /boot or /home.\n\nEnsure the name is preceeded by a forward slash (/)." 11 65 "/" 2>${ANSWER} || config_base_menu
+                fi
                 MOUNT=$(cat ${ANSWER})
                 
                 mkdir -p ${MOUNTPOINT}${MOUNT}
@@ -619,13 +618,13 @@ mount_partitions() {
 
 install_base() {
 
-    if [[ -n $(dmidecode --type 1 | grep VirtualBox) ]]; then
-       dialog --backtitle "$VERSION" --title " Installation Note " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
+    if [[ `echo ${GRAPHIC_CARD}|grep -i 'virtualbox[[:space:]]'` != "" ]]; then
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
     else
-       dialog --backtitle "$VERSION" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 20 55
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 20 55
     fi
     
-    dialog --backtitle "$VERSION" --title " Install Base " \
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Base " \
     --menu $"\nThe latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer.\n" 14 40 4 \
  	"1" $"Latest Kernel" \
 	"2" $"Latest Kernel & base-devel" \
@@ -658,7 +657,7 @@ install_base() {
   #check for a wireless device
   WIRELESS_DEV=`ip link | grep wlp | awk '{print $2}'| sed 's/://' | sed '1!d'`
   if [[ -n $WIRELESS_DEV ]]; then
-     dialog --backtitle "$VERSION - $SYSTEM" --title " Wireless Device Detected " --infobox "\nInstalling supplementary wireless packages..." 7 40 
+     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Wireless Device Detected " --infobox "\nInstalling supplementary wireless packages..." 7 40 
      sleep 2
      clear
      pacstrap ${MOUNTPOINT} iw wireless_tools wpa_actiond wpa_supplicant dialog
@@ -666,15 +665,16 @@ install_base() {
 
 }
 
-# Adapted from AIS. Integrated the configuration elements, and for UEFI systems, fixed the 
-# gummiboot installation, dropped syslinux and replaced it with rEFInd.
+# Adapted from AIS. Integrated the configuration elements. For UEFI systems fixed the 
+# gummiboot installation and dropped Syslinux.
 install_bootloader() {
 
 bios_bootloader() {
-   dialog --backtitle "$VERSION" --title " Install Bootloader (BIOS) " \
-    --menu $"\nGrub2 is recommended for beginners as the most popular and versatile option.\n\nSyslinux is a lighter and simpler alternative, usually used by Linux installation ISOs." 14 50 2 \
+   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install BIOS Bootloader " \
+    --menu $"\nGrub2 is recommended for beginners as the most popular and feature-rich option.\n\nSyslinux is a lighter and simpler alternative, usually used to boot Linux installation media. It will only work if the 'Ext' filesystems were used for partitions." 16 50 2 \
  	"1" $"Install Grub2" \
-	"2" $"Install Syslinux" 2>${ANSWER}	
+	"2" $"Install Syslinux" 2>${ANSWER}
+	
 	case $(cat ${ANSWER}) in
         "1") clear
              pacstrap ${MOUNTPOINT} grub os-prober
@@ -697,16 +697,14 @@ bios_bootloader() {
 
 uefi_bootloader() {
 
-    #Ensure efivarfs is mounted (due to unmounting undertaken during the partitioning stage)
-    dialog --backtitle "$VERSION - $SYSTEM" --title " Configuring UEFI " --infobox "\nEnsuring efivars is mounted..." 7 40 
-    sleep 2
+    #Ensure again that efivarfs is mounted
 	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
      
-    dialog --backtitle "$VERSION" --title " Install Bootloader (UEFI) " \
-    --menu $"\nGummiboot is recommended for beginners, although the UEFI partition should be mounted at /boot.\n\nrEFInd is a simple and fully automated alternative." 17 55 3 \
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install UEFI Bootloader " \
+    --menu $"\nGummiboot is recommended for beginners, although the UEFI partition should have been mounted at /boot for it.\n\nOtherwise, Grub2 is still the most popular feature-rich option for users." 15 50 2 \
  	"1" $"Install Grub2" \
-	"2" $"Install Gummiboot" \
-	"3" $"Install rEFInd" 2>${ANSWER}	
+	"2" $"Install Gummiboot" 2>${ANSWER}	
+
 	case $(cat ${ANSWER}) in
         "1") clear
              pacstrap ${MOUNTPOINT} grub os-prober
@@ -717,21 +715,24 @@ uefi_bootloader() {
              pacstrap ${MOUNTPOINT} gummiboot
              arch_chroot "gummiboot --path=${UEFI_PART} install"
              partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
-             echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-             echo -e "default  arch\ntimeout  4" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+             
+             # Deal with LTS Kernel
+             if [[ $LTS -eq 1 ]]; then
+                echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux-lts\ninitrd\t/initramfs-linux-lts.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+             else
+                echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+             fi
+             
+             echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
              dialog --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files.\n" 8 40
              gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
              gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
              ;;
-         "3") clear
-              pactrap ${MOUNTPOINT} refind-efi
-              arch_chroot "refind-install"
-              ;;
           *) install_base_menu
              ;;
     esac 
     
-    dialog --backtitle "$VERSION - $SYSTEM" --title " UEFI Tools " --infobox "\nInstalling supplementary UEFI packages..." 7 40 
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Tools " --infobox "\nInstalling supplementary UEFI packages..." 7 40 
     sleep 2
     clear
     pacstrap ${MOUNTPOINT} efibootmgr dosfstools 
@@ -748,21 +749,19 @@ uefi_bootloader() {
 # Also copy the xkbmap configuration file created earlier to the installed system
 install_alsa_xorg_input() {
 
-  dialog --backtitle "$VERSION" --title " ALSA, Xorg, and Input " --msgbox "\nBefore installing graphics card driver(s) or desktop environments, other packages are needed first:\n\nalsa - Advanced Linux Sound Architecture\nxorg-* - open-source X window system for graphics\nxf86-input-* - open-source drivers for input devices" 12 60
+  dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " ALSA, Xorg, and Input " --msgbox "\nBefore installing graphics card driver(s) or desktop environments, other packages are needed first:\n\nalsa - Advanced Linux Sound Architecture\nxorg-* - open-source X window system for graphics\nxf86-input-* - open-source drivers for input devices" 12 60
   clear	
   pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard xf86-input-vmmouse
   cp /tmp/00-keyboard.conf ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
 
 }
 
-
-
 setup_graphics_card() {
 
 # basically this is used to manually set the GC_DETECTED variable
 gc_driver_menu() {
 
-   dialog --backtitle "$VERSION" --title " Graphics Card Menu " \
+   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Graphics Card Menu " \
     --menu $"\nIf you are unsure - or your card is not listed - pick 'Unknown / Generic', which will install a generic, catch-all driver.\n" 17 50 7 \
  	"1" $"AMD/ATI" \
 	"2" $"Intel" \
@@ -827,13 +826,17 @@ install_gc() {
       pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa
       sed -i 's/^MODULES=(/MODULES=(i915 /' ${MOUNTPOINT}/etc/mkinitcpio.conf
  elif [[ $GC_DETECTED == "VirtualBox" ]]; then
+ 
       if [[ $LTS -eq 1 ]]; then
          dialog --backtitle "$VERSION" --title " VirtualBox Detected " --msgbox "\nAs the LTS kernel has been installed, the configuration process can only be semi-automated.\n\nA one-off series of commands to load the necessary modules for VirtualBox will be required AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
+         clear
          pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
       else
+         clear
          pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl   
          arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"   
       fi
+      
       # Enable vboxservice whatever the kernel type
       arch_chroot "systemctl enable vboxservice"
  elif [[ $GC_DETECTED == "VMWare" ]]; then
@@ -852,16 +855,18 @@ install_gc() {
     if [[ $GC_DETECTED == "Unknown" ]]; then
        gc_driver_menu
     else
-       dialog --backtitle "$VERSION" --title " $GC_DETECTED Detected " --yesno "\nIs your graphics card $GC_DETECTED?\n\n-Select 'Yes' to install its open-source driver.\n-Select 'No' to open the graphics card menu." 10 55 && install_gc || gc_driver_menu
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " $GC_DETECTED Detected " --yesno "\nIs your graphics card $GC_DETECTED?\n\n-Select 'Yes' to install its open-source driver.\n-Select 'No' to open the graphics card menu." 10 55 && install_gc || gc_driver_menu
     fi
 
 }
+
 
 install_de_wm() {
 
    # Only show this information box once
    if [[ $SHOW_ONCE -eq 0 ]]; then
-      dialog --backtitle "$VERSION" --title " Install Desktop Environments " --msgbox "\nThis option can be repeated to install multiple environments.\n\nGnome, KDE, and LXDE come with a display manager.\n\nCinnamon, Gnome and KDE come with a Network Manager.\n" 13 55
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Desktop Environments " --msgbox "\nThis option can be repeated to install multiple environments.\n\nGnome, KDE, and LXDE come with a display manager.\n\nCinnamon, Gnome and KDE come with a Network Manager.\n" 13 55
+      SHOW_ONCE=1
    fi
    
 	dialog --backtitle "$VERSION" --title " Install Desktop Environments  " \
@@ -988,7 +993,7 @@ install_de_wm() {
     
     # Offer to install common packages
     if [[ $COMMON_INSTALLED -eq 0 ]]; then
-       dialog --backtitle "$VERSION" --title " Install Common Packges? " --yesno "\nSome environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality.\n\nPackages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc. Those installing the full KDE desktop alone will not need to install these.\n\nThis option will only be presented ONCE.\n" 16 60 \
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Common Packges? " --yesno "\nSome environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality.\n\nPackages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc. Those installing the full KDE desktop alone will not need to install these.\n\nThis option will only be presented ONCE.\n" 16 60 \
        && clear && pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg
     fi
     
@@ -1018,9 +1023,11 @@ install_dm() {
 	           "2" $"KDM (KDE)" 2>${ANSWER}	
 	
 	          case $(cat ${ANSWER}) in
-              "1") arch_chroot "systemctl enable gdm.service" 
+              "1") arch_chroot "systemctl enable gdm.service"
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " GDM Enabled " --msgbox "\nThe GDM Display Manager has been enabled." 7 45
                 ;;
               "2") arch_chroot "systemctl enable kdm.service"
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " KDM Enabled " --msgbox "\nThe KDM Display Manager has been enabled." 7 45
                 ;;
                 *) install_desktop_menu
                 ;;
@@ -1028,10 +1035,10 @@ install_dm() {
          
          elif [[ $LXDE_INSTALLED -eq 1 ]]; then
               arch_chroot "systemctl enable lxdm.service"
-              dialog --backtitle "$VERSION" --title " LXDM Enabled " --msgbox "\nAs LXDE has been installed, its native display manager - LXDM - has now been enabled." 9 35
+              dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " LXDM Enabled " --msgbox "\nAs LXDE has been installed, its native display manager - LXDM - has now been enabled." 9 35
          
          else 
-               dialog --backtitle "$VERSION" --title " Choose Display Manager " \
+               dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Choose Display Manager " \
                --menu $"\nPlease choose between LXDM or LightDM. LXDM is recommended for beginners.\n" 11 45 2 \
  	           "1" $"LXDM" \
 	           "2" $"LightDM" 2>${ANSWER}	
@@ -1040,12 +1047,14 @@ install_dm() {
               "1") # LXDM
                    clear
                    pacstrap ${MOUNTPOINT} lxdm
-                   arch_chroot "systemctl enable lxdm.service" 
+                   arch_chroot "systemctl enable lxdm.service"
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " LXDM Enabled " --msgbox "\nThe LXDM Display Manager has been enabled." 7 50
                 ;;
               "2") # LIGHTDM
                    clear
                    pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
                    arch_chroot "systemctl enable lightdm.service"
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " LightDM Enabled " --msgbox "\nThe LightDM Display Manager has been enabled." 7 50
                 ;;
                 *) install_desktop_menu
                 ;;
@@ -1057,15 +1066,15 @@ install_dm() {
          
    # if A display manager has already been installed and enabled (DM_INSTALLED=1), show a message instead.
    else  
-         dialog --backtitle "$VERSION" --title " Display Manager Installed " --msgbox "\nA display manager has already been installed and enabled." 9 35
+         dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Display Manager Installed " --msgbox "\nA display manager has already been installed and enabled." 9 35
    fi       
 
 }
 
 install_nm() {
-
+   # Check to see if a NM has already been installed and enabled
    if [[ $NM_INSTALLED -eq 0 ]]; then
-      dialog --backtitle "$VERSION" --title " Choose Network Manager " \
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Choose Network Manager " \
       --menu $"\nNetwork Manager is recommended, especially for wireless and PPPoE/DSL connections.\n" 14 45 4 \
  	  "1" $"Connman (command line)" \
 	  "2" $"dhcpcd  (command line)" \
@@ -1094,19 +1103,21 @@ install_nm() {
            ;;
         *) install_desktop_menu
            ;;
-      esac   
+      esac
+      
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Network Manager Installed " --msgbox "\nThe network connection manager has been installed and enabled." 9 35
       NM_INSTALLED=1
    
    else
-      dialog --backtitle "$VERSION" --title " Network Manager Installed " --msgbox "\nA network connection manager has already been installed and enabled." 9 35
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Network Manager Installed " --msgbox "\nA network connection manager has already been installed and enabled." 9 35
    fi
 }
 
 
 test() {
 	
-	#ping -c 3 google.com > /tmp/.outfile &
-    #dialog --title "checking" --no-kill --tailboxbg /tmp/.outfile 20 60 
+	ping -c 3 google.com > /tmp/.outfile &
+    dialog --title "checking" --no-kill --tailboxbg /tmp/.outfile 20 60 
 
 }
 	
@@ -1120,20 +1131,32 @@ test() {
 
 # Greet the user when first starting the installer
 greeting() {
-id_system
+
 dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Welcome to $VERSION " --msgbox "\nHighlight options by pressing their numbers or by using the up/down arrow keys before pressing [enter] to confirm.\n\nSwitch between buttons by using [Tab] or the left/right arrow keys before pressing [enter] to confirm.\n\nA mouse/touchpad may also be used.\n" 0 0	
 
 }
 
 # Preparation
 prep_menu() {
-   dialog --backtitle "$VERSION" --title " Prepare Installation " \
-    --menu $"" 10 50 4 \
+	
+	if [[ $SUB_MENU != "prep_menu" ]]; then
+	   SUB_MENU="prep_menu"
+	   HIGHLIGHT_SUB=1
+	else
+	   if [[ $HIGHLIGHT_SUB != 5 ]]; then
+	      HIGHLIGHT_SUB=$(( HIGHLIGHT_SUB + 1 ))
+	   fi
+	fi
+	
+   dialog --default-item ${HIGHLIGHT_SUB} --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Prepare Installation " \
+    --menu $"\nThe desktop keyboard layout will be used for both the installer and - where installing a desktop environment - the installed system.\n" 15 50 5 \
  	"1" $"Set Desktop Keyboard Layout" \
 	"2" $"Configure Installer Mirrorlist (optional)" \
 	"3" $"Partition Disk" \
-	"4" $"Mount Partitions" 2>${ANSWER}
+	"4" $"Mount Partitions" \
+	"5" $"Back" 2>${ANSWER}
 
+    HIGHLIGHT_SUB=$(cat ${ANSWER})
 	case $(cat ${ANSWER}) in
         "1") set_xkbmap 
              ;;
@@ -1155,11 +1178,22 @@ prep_menu() {
 
 # Base Installation
 install_base_menu() {
-   dialog --backtitle "$VERSION" --title " Install Base " \
-    --menu $"" 8 40 2 \
+
+	if [[ $SUB_MENU != "install_base_menu" ]]; then
+	   SUB_MENU="install_base_menu"
+	   HIGHLIGHT_SUB=1
+	else
+	   if [[ $HIGHLIGHT_SUB != 3 ]]; then
+	      HIGHLIGHT_SUB=$(( HIGHLIGHT_SUB + 1 ))
+	   fi
+	fi
+
+   dialog --default-item ${HIGHLIGHT_SUB} --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Base " --menu "\nIt will not be necessary to install a bootloader where installing alongside an existing Linux distro that uses Grub; just update its Grub instead." 14 45 3 \
  	"1" $"Install Base" \
-	"2" $"Install Bootloader" 2>${ANSWER}	
+	"2" $"Install Bootloader" \
+	"3" $"Back" 2>${ANSWER}	
 	
+	HIGHLIGHT_SUB=$(cat ${ANSWER})
 	case $(cat ${ANSWER}) in
         "1") install_base 
              ;;
@@ -1174,15 +1208,26 @@ install_base_menu() {
 
 # Base Configuration
 config_base_menu() {
-    dialog --backtitle "$VERSION" --title " Configure Base" \
-    --menu $"" 12 50 6 \
+	
+	if [[ $SUB_MENU != "config_base_menu" ]]; then
+	   SUB_MENU="config_base_menu"
+	   HIGHLIGHT_SUB=1
+	else
+	   if [[ $HIGHLIGHT_SUB != 7 ]]; then
+	      HIGHLIGHT_SUB=$(( HIGHLIGHT_SUB + 1 ))
+	   fi
+	fi
+
+    dialog --default-item ${HIGHLIGHT_SUB} --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Configure Base" --menu $"\nBasic configuration of the base is required. This includes setting basic networking, time, language, and keyboard defaults for the installed system." 18 50 7 \
  	"1" $"Generate FSTAB" \
 	"2" $"Set Hostname" \
 	"3" $"Set Timezone" \
 	"4" $"Set Hardware Clock" \
 	"5" $"Set System Locale" \
-	"6" $"Set Virtual Console" 2>${ANSWER}	
+	"6" $"Set Virtual Console" \
+	"7" $"Back" 2>${ANSWER}	
 	
+	HIGHLIGHT_SUB=$(cat ${ANSWER})
 	case $(cat ${ANSWER}) in
         "1") generate_fstab 
              ;;
@@ -1205,19 +1250,30 @@ config_base_menu() {
 }
 
 # Root and User Configuration
-config_user_menu() {	
-    dialog --backtitle "$VERSION" --title " Configure User(s)" \
-    --menu $"" 8 50 2 \
+config_user_menu() {
+
+	if [[ $SUB_MENU != "config_user_menu" ]]; then
+	   SUB_MENU="config_user_menu"
+	   HIGHLIGHT_SUB=1
+	else
+	   if [[ $HIGHLIGHT_SUB != 3 ]]; then
+	      HIGHLIGHT_SUB=$(( HIGHLIGHT_SUB + 1 ))
+	   fi
+	fi
+
+    dialog --default-item ${HIGHLIGHT_SUB} --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Configure User(s)" --menu $"\nRoot is the default 'super-user' or 'admin' account. The same password can be set for both Root and any personal user accounts created." 13 50 3 \
  	"1" $"Set Root Pasword" \
-	"2" $"Add New User(s)" 2>${ANSWER}
+	"2" $"Add New User(s)" \
+	"3" $"Back" 2>${ANSWER}
 	
-		case $(cat ${ANSWER}) in
-        "1") set_root_password 
-             ;;
-        "2") create_new_user
-             ;;     
-          *) main_menu_online
-             ;;
+	HIGHLIGHT_SUB=$(cat ${ANSWER})
+    case $(cat ${ANSWER}) in
+    "1") set_root_password 
+         ;;
+    "2") create_new_user
+         ;;     
+      *) main_menu_online
+         ;;
     esac
     
     config_user_menu
@@ -1225,14 +1281,24 @@ config_user_menu() {
 
 
 install_desktop_menu() {
-	
-    dialog --backtitle "$VERSION" --title " Install Desktop " \
-    --menu $"" 10 55 4 \
+
+	if [[ $SUB_MENU != "install_deskop_menu" ]]; then
+	   SUB_MENU="install_deskop_menu"
+	   HIGHLIGHT_SUB=1
+	else
+	   if [[ $HIGHLIGHT_SUB != 5 ]]; then
+	      HIGHLIGHT_SUB=$(( HIGHLIGHT_SUB + 1 ))
+	   fi
+	fi
+
+    dialog --default-item ${HIGHLIGHT_SUB} --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Desktop " --menu $"\nPrior to installing a desktop environment, graphics, input, and sound drivers MUST be installed first. This will include installing graphics card drivers." 16 55 5 \
  	"1" $"Install Graphics, Input, and Sound Drivers" \
 	"2" $"Install Desktop Environment(s)" \
-	"3" $"Install Network Management" \
-	"4" $"Install Display Manager" 2>${ANSWER}
+	"3" $"Install Network Connection Manager" \
+	"4" $"Install Display Manager / Login Screen" \
+	"5" $"Back" 2>${ANSWER}
 	
+	HIGHLIGHT_SUB=$(cat ${ANSWER})
 	case $(cat ${ANSWER}) in
         "1") install_alsa_xorg_input
              setup_graphics_card 
@@ -1252,8 +1318,13 @@ install_desktop_menu() {
 }
 
 main_menu_online() {
-    dialog --backtitle "$VERSION" --title " Main Menu - Online Mode " \
-    --menu $"\nEach step can be repeated, but must be followed IN ORDER.Once complete, select Done\n" 17 50 7 \
+	
+	if [[ $HIGHLIGHT != 7 ]]; then
+	   HIGHLIGHT=$(( HIGHLIGHT + 1 ))
+	fi
+	
+    dialog --default-item ${HIGHLIGHT} --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Main Menu " \
+    --menu $"\nEach step must be followed IN ORDER. Once complete, select 'Done' to properly finalise the installation.\n" 17 50 7 \
  	"1" $"Prepare Installation" \
 	"2" $"Install Base" \
 	"3" $"Configure Base" \
@@ -1262,7 +1333,8 @@ main_menu_online() {
     "6" $"Run Mkinitcpio" \
 	"7" $"Done" 2>${ANSWER}
 
-   case $(cat ${ANSWER}) in
+    HIGHLIGHT=$(cat ${ANSWER})
+    case $(cat ${ANSWER}) in
         "1") prep_menu 
              ;;
         "2") install_base_menu
@@ -1275,17 +1347,18 @@ main_menu_online() {
              ;;
         "6") run_mkinitcpio
              ;;            
-          *) (dialog --yesno $"Close installer?" 0 0) && umount_partitions && exit 0 || main_menu_online
+          *) (dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --yesno $"Close installer?" 0 0) && umount_partitions && exit 0 || main_menu_online
              ;;
     esac
+    
     main_menu_online 
-
+    
 }
 
 # Not used yet.
 mode_menu() {
 
-   dialog --backtitle "$VERSION" --title " Installation Mode " \
+   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Mode " \
     --menu $"\nOn-line: Install the latest packages from the Arch repositories to build a custom system.\nInternet connection required.\n\nOff-line: Install Evo from this ISO.\nNo internet connection required.\n" 15 50 2 \
  	"1" $"On-line  Mode" \
 	"2" $"Off-line Mode" 2>${ANSWER}
@@ -1295,9 +1368,9 @@ mode_menu() {
       if   [[ $MODE == "1" ]]; then
            main_menu_online
       elif [[ $MODE == "2" ]]; then
-           dialog --msgbox $"This option is not available yet" 6 50 && mode_menu
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --msgbox $"This option is not available yet" 6 50 && mode_menu
       else         
-          (dialog --yesno $"Close installer?" 0 0) && exit 0 || mode_menu
+          (dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --yesno $"Close installer?" 0 0) && exit 0 || mode_menu
       fi         
      done
 	
