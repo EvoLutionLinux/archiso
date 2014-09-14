@@ -318,7 +318,7 @@ set_root_password() {
     
     if [[ $PASSWD == $PASSWD2 ]]; then 
        echo -e "${PASSWD}\n${PASSWD}" > /tmp/.passwd
-       arch_chroot "passwd root" < /tmp/.passwd
+       arch_chroot "passwd root" < /tmp/.passwd >/dev/null 2>&1
        rm /tmp/.passwd
     else
        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Root Password Error " --msgbox $"\nThe Root passwords entered do not match. Please try again.\n" 8 35
@@ -348,7 +348,7 @@ create_new_user() {
               sleep 2
               arch_chroot "useradd ${USER} -m -g users -G wheel,storage,power,network,video,audio,lp -s /bin/bash"
               echo -e "${PASSWD}\n${PASSWD}" > /tmp/.passwd
-              arch_chroot "passwd ${USER}" < /tmp/.passwd
+              arch_chroot "passwd ${USER}" < /tmp/.passwd >/dev/null 2>&1
               rm /tmp/.passwd
               arch_chroot "sed -i '/%wheel ALL=(ALL) ALL/s/^#//' /etc/sudoers"
            else
@@ -535,10 +535,10 @@ mount_partitions() {
        
        if [[ $PARTITION == "Swapfile" ]]; then
           total_memory=`grep MemTotal /proc/meminfo | awk '{print $2/1024}' | sed 's/\..*//'`
-          fallocate -l ${total_memory}M ${MOUNTPOINT}/swapfile
-          chmod 600 ${MOUNTPOINT}/swapfile
-          mkswap ${MOUNTPOINT}/swapfile
-          swapon ${MOUNTPOINT}/swapfile
+          fallocate -l ${total_memory}M ${MOUNTPOINT}/swapfile >/dev/null 2>&1
+          chmod 600 ${MOUNTPOINT}/swapfile >/dev/null 2>&1
+          mkswap ${MOUNTPOINT}/swapfile >/dev/null 2>&1
+          swapon ${MOUNTPOINT}/swapfile >/dev/null 2>&1
        else
           mkswap  $"/dev/"${PARTITION} >/dev/null 2>&1
           swapon  $"/dev/"${PARTITION} >/dev/null 2>&1
@@ -619,7 +619,7 @@ mount_partitions() {
 install_base() {
 
     if [[ `echo ${GRAPHIC_CARD}|grep -i 'virtualbox[[:space:]]'` != "" ]]; then
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
     else
        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 20 55
     fi
@@ -1008,11 +1008,11 @@ install_dm() {
  if 	[[ $DM_INSTALLED -eq 0 ]]; then
 	
          if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
-               arch_chroot "systemctl enable kdm.service"
+               arch_chroot "systemctl enable kdm.service" >/dev/null 2>&1
                dialog --backtitle "$VERSION" --title " KDM Enabled " --msgbox "\nAs KDE has been installed, its native display manager - KDM - has now been enabled.\n" 9 35
     
          elif  [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
-               arch_chroot "systemctl enable gdm.service"
+               arch_chroot "systemctl enable gdm.service" >/dev/null 2>&1
                dialog --backtitle "$VERSION" --title " GDM Enabled " --msgbox "\nAs Gnome has been installed, its native display manager - GDM - has now been enabled.\n" 9 35
 
          elif  [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
@@ -1023,10 +1023,10 @@ install_dm() {
 	           "2" $"KDM (KDE)" 2>${ANSWER}	
 	
 	          case $(cat ${ANSWER}) in
-              "1") arch_chroot "systemctl enable gdm.service"
+              "1") arch_chroot "systemctl enable gdm.service" >/dev/null 2>&1
                    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " GDM Enabled " --msgbox "\nThe GDM Display Manager has been enabled." 7 45
                 ;;
-              "2") arch_chroot "systemctl enable kdm.service"
+              "2") arch_chroot "systemctl enable kdm.service" >/dev/null 2>&1
                    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " KDM Enabled " --msgbox "\nThe KDM Display Manager has been enabled." 7 45
                 ;;
                 *) install_desktop_menu
@@ -1034,7 +1034,7 @@ install_dm() {
               esac 
          
          elif [[ $LXDE_INSTALLED -eq 1 ]]; then
-              arch_chroot "systemctl enable lxdm.service"
+              arch_chroot "systemctl enable lxdm.service" >/dev/null 2>&1
               dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " LXDM Enabled " --msgbox "\nAs LXDE has been installed, its native display manager - LXDM - has now been enabled." 9 35
          
          else 
@@ -1047,13 +1047,13 @@ install_dm() {
               "1") # LXDM
                    clear
                    pacstrap ${MOUNTPOINT} lxdm
-                   arch_chroot "systemctl enable lxdm.service"
+                   arch_chroot "systemctl enable lxdm.service" >/dev/null 2>&1
                    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " LXDM Enabled " --msgbox "\nThe LXDM Display Manager has been enabled." 7 50
                 ;;
               "2") # LIGHTDM
                    clear
                    pacstrap ${MOUNTPOINT} lightdm lightdm-gtk3-greeter
-                   arch_chroot "systemctl enable lightdm.service"
+                   arch_chroot "systemctl enable lightdm.service" >/dev/null 2>&1
                    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " LightDM Enabled " --msgbox "\nThe LightDM Display Manager has been enabled." 7 50
                 ;;
                 *) install_desktop_menu
