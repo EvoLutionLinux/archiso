@@ -412,7 +412,7 @@ select_device() {
         DEVICE="${DEVICE} ${i} -"
     done
     
-    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Device " --menu "\n." 10 40 3 ${DEVICE} 2>${ANSWER} || prep_menu
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Device " --menu "\nDevices (/dev) are available hard-disks and USB-sticks to install on. The first is /sda, the second /sdb, and so on.\n\nWhere using a USB-stick to boot Evo, be careful as it will also be listed!" 16 45 3 ${DEVICE} 2>${ANSWER} || prep_menu
     DEVICE=$(cat ${ANSWER}) 
   }
 
