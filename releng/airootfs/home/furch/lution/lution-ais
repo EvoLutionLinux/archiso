@@ -337,10 +337,10 @@ create_new_user() {
            dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " User Name Error " --msgbox $"\nNo user name was entered. Please try again.\n" 8 35
            create_new_user
         else
-           dialog --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
            PASSWD=$(cat ${ANSWER}) 
     
-           dialog --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
            PASSWD2=$(cat ${ANSWER}) 
     
            if [[ $PASSWD == $PASSWD2 ]]; then         
@@ -413,7 +413,25 @@ select_device() {
     done
     
     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Device " --menu "\nDevices (/dev) are available hard-disks and USB-sticks to install on. The first is /sda, the second /sdb, and so on.\n\nWhere using a USB-stick to boot Evo, be careful as it will also be listed!" 16 45 3 ${DEVICE} 2>${ANSWER} || prep_menu
-    DEVICE=$(cat ${ANSWER}) 
+    DEVICE=$(cat ${ANSWER})
+ 
+  }
+
+# Same as above, but goes to install_base_menu instead where cancelling
+select_grub_device() {
+	
+    GRUB_DEVICE=""
+    grub_devices_list=(`lsblk -d | awk '{print "/dev/" $1}' | grep 'sd\|hd\|vd'`);
+    
+    for i in ${grub_devices_list[@]}; do
+        GRUB_DEVICE="${GRUB_DEVICE} ${i} -"
+    done
+    
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Grub Device " --menu "\nDevices (/dev) are available hard-disks and USB-sticks to install on. The first is /sda, the second /sdb, and so on.\n\nWhere using a USB-stick to boot Evo, be careful as it will also be listed!" 16 45 3 ${GRUB_DEVICE} 2>${ANSWER} || install_base_menu
+    GRUB_DEVICE=$(cat ${ANSWER})
+    clear
+    arch_chroot "grub-install --target=i386-pc --recheck ${GRUB_DEVICE}"
+ 
   }
 
 # Adapted from AIS. Integrated Gparted, and dropped most of the other partitioning tools.
@@ -514,7 +532,7 @@ mount_partitions() {
 	find_partitions
 	
 	# Identify and mount root
-	dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select ROOT Partition " --menu "" 12 40 4 ${PARTITIONS} 2>${ANSWER} || prep_menu
+	dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select ROOT Partition " --menu "\nThis is the partition where Arch will be installed." 13 40 4 ${PARTITIONS} 2>${ANSWER} || prep_menu
 	PARTITION=$(cat ${ANSWER})
     ROOT_PART=${PARTITION}
 	INST_DEV=$"/dev/"$(cat ${ANSWER} | sed 's/[0-9]*//g')
@@ -529,7 +547,7 @@ mount_partitions() {
     confirm_mount ${MOUNTPOINT}
 	
 	# Identify and create swap, if applicable
-    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select SWAP Partition " --menu "\n." 12 40 4 $"None" $"-" $"Swapfile" $"-" ${PARTITIONS} 2>${ANSWER} || prep_menu  
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select SWAP Partition " --menu "\nIf using a Swapfile, it will be the same size as your RAM." 13 40 4 $"None" $"-" $"Swapfile" $"-" ${PARTITIONS} 2>${ANSWER} || prep_menu  
     if [[ $(cat ${ANSWER}) != "None" ]]; then    
        PARTITION=$(cat ${ANSWER})
        
@@ -551,7 +569,7 @@ mount_partitions() {
     # Extra Step for VFAT UEFI Partition
     if [[ $UEFI -eq 1 ]]; then
     
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Partition " --menu "" 12 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu  
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Partition " --menu "\nThis is a special partition for booting UEFI systems." 13 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu  
        PARTITION=$(cat ${ANSWER})
        
        # If there is already a fat/vfat partition...
@@ -582,7 +600,7 @@ mount_partitions() {
     
     # All other partitions
        while [[ $NUMBER_PARTITIONS > 0 ]]; do 
-             dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Partition " --menu "\n." 12 40 4 $"Done" $"-" ${PARTITIONS} 2>${ANSWER} || config_base_menu 
+             dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Additional Partition " --menu "\nSelect additional partitions in any order, or 'Done' to finish." 13 40 4 $"Done" $"-" ${PARTITIONS} 2>${ANSWER} || config_base_menu 
              PARTITION=$(cat ${ANSWER})
              
              if [[ $PARTITION == "Done" ]]; then
@@ -671,14 +689,16 @@ install_bootloader() {
 
 bios_bootloader() {
    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install BIOS Bootloader " \
-    --menu $"\nGrub2 is recommended for beginners as the most popular and feature-rich option.\n\nSyslinux is a lighter and simpler alternative, usually used to boot Linux installation media. It will only work if the 'Ext' filesystems were used for partitions." 16 50 2 \
+    --menu $"\nGrub2 is recommended for beginners. The installation device can also be selected.\n\nSyslinux is a lighter and simpler alternative, usually used to boot Linux installation media. It will only work with 'ext' filesystems, however." 16 50 2 \
  	"1" $"Install Grub2" \
 	"2" $"Install Syslinux" 2>${ANSWER}
 	
 	case $(cat ${ANSWER}) in
         "1") clear
              pacstrap ${MOUNTPOINT} grub os-prober
-             arch_chroot "grub-install --target=i386-pc --recheck ${INST_DEV}"
+             dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select Grub Device " --yesno "\nInstall Grub on the same device/hard-drive as Root ($INST_DEV)?\n\nPick 'Yes' if you are only installing on one device." 10 60 \
+			 && clear && arch_chroot "grub-install --target=i386-pc --recheck ${INST_DEV}" || select_grub_device
+             # Whatever the choice, same configuration process
              arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
              ;;
         "2") clear
@@ -869,7 +889,7 @@ install_de_wm() {
       SHOW_ONCE=1
    fi
    
-	dialog --backtitle "$VERSION" --title " Install Desktop Environments  " \
+	dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Desktop Environments  " \
     --menu "\nDesktop Environments are listed first, and may have multiple download options.\n\nKDE is a 750MB+ download." 19 45 8 \
  	"1" $"Cinnamon" \
 	"2" $"Enlightenment" \
@@ -1009,15 +1029,15 @@ install_dm() {
 	
          if    [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 0 ]]; then
                arch_chroot "systemctl enable kdm.service" >/dev/null 2>&1
-               dialog --backtitle "$VERSION" --title " KDM Enabled " --msgbox "\nAs KDE has been installed, its native display manager - KDM - has now been enabled.\n" 9 35
+               dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " KDM Enabled " --msgbox "\nAs KDE has been installed, its native display manager - KDM - has now been enabled.\n" 9 35
     
          elif  [[ $KDE_INSTALLED -eq 0 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
                arch_chroot "systemctl enable gdm.service" >/dev/null 2>&1
-               dialog --backtitle "$VERSION" --title " GDM Enabled " --msgbox "\nAs Gnome has been installed, its native display manager - GDM - has now been enabled.\n" 9 35
+               dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " GDM Enabled " --msgbox "\nAs Gnome has been installed, its native display manager - GDM - has now been enabled.\n" 9 35
 
          elif  [[ $KDE_INSTALLED -eq 1 ]] && [[ $GNOME_INSTALLED -eq 1 ]]; then
          
-               dialog --backtitle "$VERSION" --title " Choose GDM or KDM " \
+               dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Choose GDM or KDM " \
                --menu $"\nBoth Gnome and KDE have been installed. Please select your preferred display manager.\n" 12 45 2 \
  	           "1" $"GDM (Gnome)" \
 	           "2" $"KDM (KDE)" 2>${ANSWER}	
@@ -1381,6 +1401,7 @@ mode_menu() {
 ##                        Execution     							##
 ##																	##
 ######################################################################
+
 
 check_evo_requirements
 id_system
