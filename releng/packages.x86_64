@@ -10,7 +10,7 @@ xorg-server-utils
 #video drivers
 mesa 
 xf86-video-modesetting
-xf86-video-fbdev 
+#xf86-video-fbdev 
 
 #networking
 networkmanager

@@ -54,7 +54,7 @@
     ${alignr}${color #BEBEBE}Lution-AIS Installer${voffset -5} 
  
     ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + g 
-    ${alignr}${color #BEBEBE}On-Line Installation Guide${voffset -5} 
+    ${alignr}${color #BEBEBE}Evo/Lution Forums${voffset -5} 
      
     ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + t 
     ${alignr}${color #BEBEBE}Terminal${voffset -5} 
