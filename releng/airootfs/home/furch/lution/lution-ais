@@ -727,12 +727,12 @@ uefi_bootloader() {
 
 	case $(cat ${ANSWER}) in
         "1") clear
-             pacstrap ${MOUNTPOINT} grub os-prober
+             pacstrap ${MOUNTPOINT} grub os-prober efibootmgr dosfstools 
              arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_PART} --bootloader-id=arch_grub --recheck"
              arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
              ;;
         "2") clear
-             pacstrap ${MOUNTPOINT} gummiboot
+             pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools 
              arch_chroot "gummiboot --path=${UEFI_PART} install"
              partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
              
@@ -752,10 +752,10 @@ uefi_bootloader() {
              ;;
     esac 
     
-    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Tools " --infobox "\nInstalling supplementary UEFI packages..." 7 40 
-    sleep 2
-    clear
-    pacstrap ${MOUNTPOINT} efibootmgr dosfstools 
+#    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Tools " --infobox "\nInstalling supplementary UEFI packages..." 7 40 
+#    sleep 2
+#    clear
+#    pacstrap ${MOUNTPOINT} efibootmgr dosfstools 
 }
 
     if [[ $UEFI -eq 0 ]]; then
