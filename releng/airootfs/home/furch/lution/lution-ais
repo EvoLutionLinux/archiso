@@ -114,9 +114,6 @@ id_system() {
       UEFI=0
       SYSTEM="BIOS System Detected"
     fi
-    
-    # Set the default PATH variable
-    arch_chroot "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/core_perl"
 }
 
 # Taken from AIS. An excellent bit of code!
@@ -630,7 +627,7 @@ mount_partitions() {
 install_base() {
 
     if [[ `echo ${GRAPHIC_CARD}|grep -i 'virtualbox[[:space:]]'` != "" ]]; then
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 0 0
     else
        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 0 0
     fi
@@ -736,6 +733,9 @@ uefi_bootloader() {
 
 }
 
+    # Set the default PATH variable
+    arch_chroot "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/core_perl"
+
     if [[ $UEFI -eq 0 ]]; then
        bios_bootloader
     else
@@ -825,18 +825,20 @@ install_gc() {
       sed -i 's/^MODULES=(/MODULES=(i915 /' ${MOUNTPOINT}/etc/mkinitcpio.conf
  elif [[ $GC_DETECTED == "VirtualBox" ]]; then
  
+      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nIf for any reason the VirtualBox guest modules do not load for the installed system (e.g. low resolution and scrollbars after booting), a one-off series of commands will fix this:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
+ 
       if [[ $LTS -eq 1 ]]; then
-         dialog --backtitle "$VERSION" --title " VirtualBox Detected " --msgbox "\nAs the LTS kernel has been installed, the configuration process can only be semi-automated.\n\nA one-off series of commands to load the necessary modules for VirtualBox will be required AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
          clear
          pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
       else
          clear
-         pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl   
-         arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"   
+         pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl    
       fi
       
-      # Enable vboxservice whatever the kernel type
+      # Load modules and enable vboxservice whatever the kernel type
+      arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"  
       arch_chroot "systemctl enable vboxservice"
+      
  elif [[ $GC_DETECTED == "VMWare" ]]; then
       pacstrap ${MOUNTPOINT} xf86-video-vmware mesa-libgl mesa
  elif [[ $GC_DETECTED == "Via" ]]; then
@@ -1206,6 +1208,9 @@ install_base_menu() {
 
 # Base Configuration
 config_base_menu() {
+	
+	# Set the default PATH variable
+    arch_chroot "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/core_perl"
 	
 	if [[ $SUB_MENU != "config_base_menu" ]]; then
 	   SUB_MENU="config_base_menu"
