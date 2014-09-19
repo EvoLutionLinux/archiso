@@ -114,6 +114,9 @@ id_system() {
       UEFI=0
       SYSTEM="BIOS System Detected"
     fi
+    
+    # Set the default PATH variable
+    arch_chroot "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/core_perl"
 }
 
 # Taken from AIS. An excellent bit of code!
@@ -292,6 +295,7 @@ generate_fstab() {
 
     #[[ $SWAPFILE -eq 1 ]] && sed -i "s/\/mnt//" ${MOUNTPOINT}/etc/fstab
     [[ -f ${MOUNTPOINT}/swapfile ]] && sed -i "s/\\${MOUNTPOINT}//" ${MOUNTPOINT}/etc/fstab
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Check FSTAB " --msgbox "\nPlease check the FSTAB file, before closing it to continue." 0 0
     gksu leafpad ${MOUNTPOINT}/etc/fstab
 }
 
@@ -579,19 +583,8 @@ mount_partitions() {
           mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
        fi   
        
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\n/boot is recommended, especially if intending to use the Gummiboot bootloader." 12 40 2 \
- 	   "1" $"/boot" \
-	   "2" $"/boot/efi" 2>${ANSWER}	
-       
-       case $(cat ${ANSWER}) in
-        "1") UEFI_PART="/boot"
-             ;;
-        "2") UEFI_PART="/boot/efi"
-             ;;
-          *) config_base_menu
-             ;;
-       esac
-       
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI BOOTLOADER " --msgbox "\nNOTE: Where installing a bootloader, Gummiboot will be installed by default at /boot.\n" 0 0    
+       UEFI_PART="/boot"
        mkdir -p ${MOUNTPOINT}${UEFI_PART}
        mount $"/dev/"${PARTITION} ${MOUNTPOINT}${UEFI_PART}
        confirm_mount ${MOUNTPOINT}${UEFI_PART}     
@@ -637,9 +630,9 @@ mount_partitions() {
 install_base() {
 
     if [[ `echo ${GRAPHIC_CARD}|grep -i 'virtualbox[[:space:]]'` != "" ]]; then
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 17 55
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR).\n\nThe Long Term Support (LTS) Kernel will require a one-off series of commands to load the necessary modules AFTER booting the installed system:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
     else
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 20 55
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 0 0
     fi
     
     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Base " \
@@ -687,7 +680,8 @@ install_base() {
 # gummiboot installation and dropped Syslinux.
 install_bootloader() {
 
-bios_bootloader() {
+bios_bootloader() {	
+	
    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install BIOS Bootloader " \
     --menu $"\nGrub2 is recommended for beginners. The installation device can also be selected.\n\nSyslinux is a lighter and simpler alternative, usually used to boot Linux installation media. It will only work with 'ext' filesystems, however." 16 50 2 \
  	"1" $"Install Grub2" \
@@ -720,42 +714,26 @@ uefi_bootloader() {
     #Ensure again that efivarfs is mounted
 	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
      
-    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install UEFI Bootloader " \
-    --menu $"\nGummiboot is recommended for beginners, although the UEFI partition should have been mounted at /boot for it.\n\nOtherwise, Grub2 is still the most popular feature-rich option for users." 15 50 2 \
- 	"1" $"Install Grub2" \
-	"2" $"Install Gummiboot" 2>${ANSWER}	
-
-	case $(cat ${ANSWER}) in
-        "1") clear
-             pacstrap ${MOUNTPOINT} grub os-prober efibootmgr dosfstools 
-             arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_PART} --bootloader-id=arch_grub --recheck"
-             arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
-             ;;
-        "2") clear
-             pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools 
-             arch_chroot "gummiboot --path=${UEFI_PART} install"
-             partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
-             
-             # Deal with LTS Kernel
-             if [[ $LTS -eq 1 ]]; then
-                echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux-lts\ninitrd\t/initramfs-linux-lts.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-             else
-                echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-             fi
-             
-             echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
-             dialog --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files.\n" 8 40
-             gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
-             gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
-             ;;
-          *) install_base_menu
-             ;;
-    esac 
+    # Gummiboot is the de-facto UEFI bootloader for the moment   
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI BOOTLOADER " --msgbox "\nGummiboot will be installed by default as the UEFI bootloader at /boot.\n" 0 0
     
-#    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Tools " --infobox "\nInstalling supplementary UEFI packages..." 7 40 
-#    sleep 2
-#    clear
-#    pacstrap ${MOUNTPOINT} efibootmgr dosfstools 
+    clear
+    pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools 
+    arch_chroot "gummiboot --path=${UEFI_PART} install"
+    partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
+             
+     # Deal with LTS Kernel
+     if [[ $LTS -eq 1 ]]; then
+        echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux-lts\ninitrd\t/initramfs-linux-lts.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+     else
+        echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+     fi
+             
+     echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files before closing them to continue.\n" 8 40
+     gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
+     gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+
 }
 
     if [[ $UEFI -eq 0 ]]; then
