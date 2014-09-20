@@ -445,7 +445,7 @@ create_partitions(){
 	"3" $"GDisk   (CLI - UEFI/GPT)" 2>${ANSWER}	
 
     case $(cat ${ANSWER}) in
-        "1") gksu gparted ${DEVICE} 
+        "1") gksu gparted ${DEVICE} >/dev/null 2>&1
              ;;
         "2") cfdisk ${DEVICE}
              ;;
@@ -580,8 +580,19 @@ mount_partitions() {
           mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
        fi   
        
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI BOOTLOADER " --msgbox "\nNOTE: Where installing a bootloader, Gummiboot will be installed by default at /boot.\n" 0 0    
-       UEFI_PART="/boot"
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\n/boot is recommended, especially if intending to use the Gummiboot bootloader." 12 40 2 \
+ 	   "1" $"/boot" \
+	   "2" $"/boot/efi" 2>${ANSWER}	
+       
+       case $(cat ${ANSWER}) in
+        "1") UEFI_PART="/boot"
+             ;;
+        "2") UEFI_PART="/boot/efi"
+             ;;
+          *) config_base_menu
+             ;;
+       esac
+       
        mkdir -p ${MOUNTPOINT}${UEFI_PART}
        mount $"/dev/"${PARTITION} ${MOUNTPOINT}${UEFI_PART}
        confirm_mount ${MOUNTPOINT}${UEFI_PART}     
@@ -611,9 +622,15 @@ mount_partitions() {
                 fi
                 MOUNT=$(cat ${ANSWER})
                 
-                mkdir -p ${MOUNTPOINT}${MOUNT}
-                mount $"/dev/"${PARTITION} ${MOUNTPOINT}${MOUNT}
-                confirm_mount ${MOUNTPOINT}${MOUNT}
+                # Ensure that no attempt is made to mount partitions without names
+                if [[ $MOUNT != "/" ]] && [[ $MOUNT != "//" ]]; then       
+                      mkdir -p ${MOUNTPOINT}${MOUNT}
+                      mount $"/dev/"${PARTITION} ${MOUNTPOINT}${MOUNT}
+                      confirm_mount ${MOUNTPOINT}${MOUNT}
+                else
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Partition Name Error " --msgbox "\nPartitions cannot be mounted at '/'. A name must be given after the forward slash.\n\n" 0 0
+                fi
+                
              fi
        done
 }	
@@ -711,25 +728,44 @@ uefi_bootloader() {
     #Ensure again that efivarfs is mounted
 	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
      
-    # Gummiboot is the de-facto UEFI bootloader for the moment   
-    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI BOOTLOADER " --msgbox "\nGummiboot will be installed by default as the UEFI bootloader at /boot.\n" 0 0
-    
-    clear
-    pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools 
-    arch_chroot "gummiboot --path=${UEFI_PART} install"
-    partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install UEFI Bootloader " \
+    --menu $"\nGummiboot is recommended for beginners, although the UEFI partition should have been mounted at /boot for it.\n\nOtherwise, Grub2 is still the most popular feature-rich option for users." 15 50 2 \
+    "1" $"Install Grub2" \
+    "2" $"Install Gummiboot" 2>${ANSWER}
+
+     case $(cat ${ANSWER}) in
+     "1") clear
+          pacstrap ${MOUNTPOINT} grub os-prober efibootmgr dosfstools
+          arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_PART} --bootloader-id=grub --recheck"
+          arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
+          
+          # Fix for firmware that requires the efi stub to be placed in a special boot location
+          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Grub UEFI " --yesno $"\nSome computer firmware requires that the bootable ${UEFI_PART}/EFI/grub/grubx64.efi file be copied as ${UEFI_PART}/EFI/boot/bootx64.efi \n\nWould you like to copy this file? It is recommended to select 'Yes'." 0 0 \
+          && arch_chroot "mkdir ${UEFI_PART}/EFI/boot" \
+          && arch_chroot "cp ${UEFI_PART}/EFI/grub/grubx64.efi ${UEFI_PART}/EFI/boot/bootx64.efi" \
+          && dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI File Copied " --infobox "\nDone!\n" 0 0 \
+          ;;
+     "2") clear
+          pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools
+          arch_chroot "gummiboot --path=${UEFI_PART} install"
+          partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
              
-     # Deal with LTS Kernel
-     if [[ $LTS -eq 1 ]]; then
-        echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux-lts\ninitrd\t/initramfs-linux-lts.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-     else
-        echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
-     fi
-             
-     echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
-     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files before closing them to continue.\n" 8 40
-     gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
-     gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+          # Deal with LTS Kernel
+          if [[ $LTS -eq 1 ]]; then
+             echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux-lts\ninitrd\t/initramfs-linux-lts.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+          else
+             echo -e "title\tArch Linux\nlinux\t/vmlinuz-linux\ninitrd\t/initramfs-linux.img\noptions\troot=PARTUUID=${partuuid} rw" > ${MOUNTPOINT}/boot/loader/entries/arch.conf
+          fi
+          
+          # Set and check the config files  
+          echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files before closing them to continue.\n" 8 40
+          gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
+          gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+          ;;
+      *) install_base_menu
+
+      esac 
 
 }
 
@@ -1373,7 +1409,7 @@ mode_menu() {
       elif [[ $MODE == "2" ]]; then
            dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --msgbox $"This option is not available yet" 6 50 && mode_menu
       else         
-          (dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --yesno $"Close installer?" 0 0) && exit 0 || mode_menu
+          (dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " End Installation "--yesno $"Close installer?" 0 0) && exit 0 || mode_menu
       fi         
      done
 	

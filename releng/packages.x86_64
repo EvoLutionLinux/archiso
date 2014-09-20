@@ -2,23 +2,22 @@ gummiboot
 prebootloader
 refind-efi
 
-#xorg packages
+##xorg packages
 xorg-server 
 xorg-xinit 
 xorg-server-utils
 
-#video drivers
+##video drivers
 mesa 
 xf86-video-modesetting
-#xf86-video-fbdev 
 
-#networking
+##networking
 networkmanager
 network-manager-applet
 rp-pppoe
 wireless_tools
 
-#system
+##system
 python2-xdg
 virtualbox-guest-utils
 virtualbox-guest-modules
@@ -26,30 +25,30 @@ xf86-input-keyboard
 xf86-input-synaptics
 xf86-input-vmmouse
 
-#permissions
+##permissions
 gksu
 polkit
 lxpolkit
 gnome-keyring
 
-#theme
+##theme
 numix-themes
 
-#fonts
+##fonts
 ttf-dejavu
 
-#environment
+##environment
 openbox
 oblogout
 tint2
 conky
 
-#applications
+##applications
 gparted
 leafpad
 lxterminal
 netsurf
 xterm
 
-#packages for installer
+##packages for installer
 hwinfo
