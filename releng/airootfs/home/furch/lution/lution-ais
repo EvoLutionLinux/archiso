@@ -744,6 +744,7 @@ uefi_bootloader() {
           && arch_chroot "mkdir ${UEFI_PART}/EFI/boot" \
           && arch_chroot "cp ${UEFI_PART}/EFI/grub/grubx64.efi ${UEFI_PART}/EFI/boot/bootx64.efi" \
           && dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI File Copied " --infobox "\nDone!\n" 0 0 \
+          && sleep 2
           ;;
      "2") clear
           pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools
