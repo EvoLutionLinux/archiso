@@ -623,12 +623,12 @@ mount_partitions() {
                 MOUNT=$(cat ${ANSWER})
                 
                 # Ensure that no attempt is made to mount partitions without names
-                if [[ $MOUNT != "/" ]] && [[ $MOUNT != "//" ]]; then       
+                if [[ $MOUNT != "/" ]] && [[ $MOUNT != "//" ]] && [[ $MOUNT != "" ]]; then       
                       mkdir -p ${MOUNTPOINT}${MOUNT}
                       mount $"/dev/"${PARTITION} ${MOUNTPOINT}${MOUNT}
                       confirm_mount ${MOUNTPOINT}${MOUNT}
                 else
-                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Partition Name Error " --msgbox "\nPartitions cannot be mounted at '/'. A name must be given after the forward slash.\n\n" 0 0
+                   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Partition Name Error " --msgbox "\nPartition cannot be mounted. A name must be given after a forward slash.\n\n" 0 0
                 fi
                 
              fi
