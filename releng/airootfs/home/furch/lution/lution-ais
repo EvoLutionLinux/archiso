@@ -51,7 +51,9 @@ VERSION="Lution-AIS 0.3"
   UEFI=0               	# Is the system UEFI?
   SYSTEM="Unknown"     	# Display whether system is BIOS or UEFI. Default is "unknown"
   ROOT_PART=""          # ROOT partition
-  UEFI_PART=""          # UEFI partition
+  UEFI_PART=""			# UEFI partition
+  UEFI_MOUNT=""         # UEFI mountpoint
+  BOOTLDR_ID=""         # Grub Bootloader ID for UEFI installations
   INST_DEV=""           # Device where system has been installed
   HIGHLIGHT=0           # Highlight items for Main Menu
   HIGHLIGHT_SUB=0	    # Highlight items for submenu
@@ -572,6 +574,7 @@ mount_partitions() {
     
        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Partition " --menu "\nThis is a special partition for booting UEFI systems." 13 40 4 ${PARTITIONS} 2>${ANSWER} || config_base_menu  
        PARTITION=$(cat ${ANSWER})
+       UEFI_PART=$"/dev/"${PARTITION}
        
        # If there is already a fat/vfat partition...
        if [[ $(fsck -N /dev/$PARTITION | grep fat) ]]; then
@@ -580,22 +583,25 @@ mount_partitions() {
           mkfs.vfat -F32 $"/dev/"${PARTITION} >/dev/null 2>&1
        fi   
        
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\n/boot is recommended, especially if intending to use the Gummiboot bootloader." 12 40 2 \
+       # Inform users of the mountpoint options and consequences
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Mountpoint Options " --msgbox $"\nThe bootloader(s) that can be installed later will depend on where the UEFI partition is mounted.\n\nSelect /boot for Gummiboot. This is recommended for beginners as the easiest option, especially where dual-booting.\n\nSelect /boot/efi for rEFInd. Although flashy, it is recommended for experienced users due to need to be manually updated.\n\nOtherwise, either mountpoint will work for Grub." 17 55
+       
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\nGummiboot requires /boot, rEFInd requires /boot/efi, and Grub will work with either." 12 40 2 \
  	   "1" $"/boot" \
 	   "2" $"/boot/efi" 2>${ANSWER}	
        
        case $(cat ${ANSWER}) in
-        "1") UEFI_PART="/boot"
+        "1") UEFI_MOUNT="/boot"
              ;;
-        "2") UEFI_PART="/boot/efi"
+        "2") UEFI_MOUNT="/boot/efi"
              ;;
           *) config_base_menu
              ;;
        esac
        
-       mkdir -p ${MOUNTPOINT}${UEFI_PART}
-       mount $"/dev/"${PARTITION} ${MOUNTPOINT}${UEFI_PART}
-       confirm_mount ${MOUNTPOINT}${UEFI_PART}     
+       mkdir -p ${MOUNTPOINT}${UEFI_MOUNT}
+       mount $"/dev/"${PARTITION} ${MOUNTPOINT}${UEFI_MOUNT}
+       confirm_mount ${MOUNTPOINT}${UEFI_MOUNT}     
        
     fi
     
@@ -724,31 +730,34 @@ bios_bootloader() {
 }
 
 uefi_bootloader() {
-
+    # Need to add safeguard to check UEFI_MOUNT before proceeding for Gummiboot and rEFInd.
     #Ensure again that efivarfs is mounted
 	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
      
     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install UEFI Bootloader " \
-    --menu $"\nGummiboot is recommended for beginners, although the UEFI partition should have been mounted at /boot for it.\n\nOtherwise, Grub2 is still the most popular feature-rich option for users." 15 50 2 \
+    --menu $"\nGrub2 is the most popular and feature-rich option (no UEFI mount preference).\n\nGummiboot is a recommended alternative for beginners (UEFI partition must be at /boot).\n\nrEFInd is an alternative for more experienced users (UEFI partition must be at /boot/efi)." 18 50 3 \
     "1" $"Install Grub2" \
-    "2" $"Install Gummiboot" 2>${ANSWER}
+    "2" $"Install Gummiboot" \
+    "3" $"Install rEFInd" 2>${ANSWER}
 
      case $(cat ${ANSWER}) in
-     "1") clear
+     "1") # Grub2
+          clear
           pacstrap ${MOUNTPOINT} grub os-prober efibootmgr dosfstools
-          arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_PART} --bootloader-id=grub --recheck"
-          arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
           
-          # Fix for firmware that requires the efi stub to be placed in a special boot location
-          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Grub UEFI " --yesno $"\nSome computer firmware requires that the bootable ${UEFI_PART}/EFI/grub/grubx64.efi file be copied as ${UEFI_PART}/EFI/boot/bootx64.efi \n\nWould you like to copy this file? It is recommended to select 'Yes'." 0 0 \
-          && arch_chroot "mkdir ${UEFI_PART}/EFI/boot" \
-          && arch_chroot "cp ${UEFI_PART}/EFI/grub/grubx64.efi ${UEFI_PART}/EFI/boot/bootx64.efi" \
-          && dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI File Copied " --infobox "\nDone!\n" 0 0 \
-          && sleep 2
+          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set Grub as Default Bootloader? " --yesno $"\nSome UEFI firmware may not detect Grub unless it is set as the default bootloader, resulting in an unbootable system in such instances.\n\nDo you wish to set Grub as the default bootloader?\n\nIt is recommended to select 'Yes', especially for beginners. This will install the bootable grubx64.efi stub to ${UEFI_MOUNT}/EFI/boot and rename it to bootx64.efi, as required.\n\nOtherwise select 'No', particularly if there is already a default bootloader, and/or where intending to use multiple bootloaders." 18 65 \
+          && BOOTLDR_ID="boot" || BOOTLDR_ID="grub"
+          
+          clear
+          arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_MOUNT} --bootloader-id=${BOOTLDR_ID} --recheck"          
+          [[ $BOOTLDR_ID == "boot" ]] && arch_chroot "mv -f ${UEFI_MOUNT}/EFI/boot/grubx64.efi ${UEFI_MOUNT}/EFI/boot/bootx64.efi" 
+          arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
           ;;
-     "2") clear
+          
+     "2") # Gummiboot
+          clear
           pacstrap ${MOUNTPOINT} gummiboot efibootmgr dosfstools
-          arch_chroot "gummiboot --path=${UEFI_PART} install"
+          arch_chroot "gummiboot --path=${UEFI_MOUNT} install"
           partuuid=`blkid -s PARTUUID $"/dev/"${ROOT_PART} | awk '{print $2}' | sed 's/"//g' | sed 's/^.*=//'`
              
           # Deal with LTS Kernel
@@ -759,13 +768,28 @@ uefi_bootloader() {
           fi
           
           # Set and check the config files  
-          echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+          echo -e "default  arch\ntimeout  5" > ${MOUNTPOINT}${UEFI_MOUNT}/loader/loader.conf
           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Gummiboot Configuration Check " --msgbox "\nPlease check the arch and loader configuration files before closing them to continue.\n" 8 40
-          gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/entries/arch.conf
-          gksu leafpad ${MOUNTPOINT}${UEFI_PART}/loader/loader.conf
+          gksu leafpad ${MOUNTPOINT}${UEFI_MOUNT}/loader/entries/arch.conf
+          gksu leafpad ${MOUNTPOINT}${UEFI_MOUNT}/loader/loader.conf
           ;;
+          
+      "3") # rEFInd
+           # Ensure that UEFI partition has been mounted to /boot/efi due to bug in script. Could "fix" it for installation, but
+           # This could result in unknown consequences should the script be updated at some point.
+           if [[ $UEFI_MOUNT == "/boot/efi" ]]; then      
+              clear
+              pacstrap ${MOUNTPOINT} refind-efi efibootmgr dosfstools    
+              dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set rEFInd as Default Bootloader? " --yesno $"\nSome UEFI firmware may not detect rEFInd unless it is set as the default bootloader, resulting in an unbootable system in such instances.\n\nDo you wish to set rEFInd as the default bootloader?\n\nIt is recommended to select 'Yes', especially for beginners. This will install rEFInd to ${UEFI_MOUNT}/EFI/boot with the bootx64.efi stub required.\n\nOtherwise select 'No', particularly if there is already a default bootloader, and/or where intending to use multiple bootloaders." 18 65 \
+              && clear && arch_chroot "refind-install --usedefault ${UEFI_PART} --alldrivers" || clear && arch_chroot "refind-install"
+           else 
+              dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " rEFInd UEFI Mountpoint " --msgbox $"\nThe rEFInd installation script will not work unless the UEFI partition has been mounted to /boot/efi. Please select either Gummiboot (recommended) or Grub." 0 0
+              uefi_bootloader
+           fi
+           ;;
+      
       *) install_base_menu
-
+         ;;
       esac 
 
 }
@@ -786,7 +810,7 @@ install_alsa_xorg_input() {
 
   dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " ALSA, Xorg, and Input " --msgbox "\nBefore installing graphics card driver(s) or desktop environments, other packages are needed first:\n\nalsa - Advanced Linux Sound Architecture\nxorg-* - open-source X window system for graphics\nxf86-input-* - open-source drivers for input devices" 12 60
   clear	
-  pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard xf86-input-vmmouse
+  pacstrap ${MOUNTPOINT} alsa-utils xorg-server xorg-server-utils xorg-xinit xf86-input-synaptics xf86-input-keyboard xf86-input-mouse
   cp /tmp/00-keyboard.conf ${MOUNTPOINT}/etc/X11/xorg.conf.d/00-keyboard.conf
 
 }
@@ -877,7 +901,7 @@ install_gc() {
       arch_chroot "systemctl enable vboxservice"
       
  elif [[ $GC_DETECTED == "VMWare" ]]; then
-      pacstrap ${MOUNTPOINT} xf86-video-vmware mesa-libgl mesa
+      pacstrap ${MOUNTPOINT} xf86-video-vmware xf86-input-vmmouse mesa-libgl mesa
  elif [[ $GC_DETECTED == "Via" ]]; then
       pacstrap ${MOUNTPOINT} xf86-video-openchrome
  elif [[ $GC_DETECTED == "Generic" ]]; then 

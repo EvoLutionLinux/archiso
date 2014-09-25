@@ -21,6 +21,7 @@
 #xf86-input-keyboard
 #xf86-input-synaptics
 #xf86-input-vmmouse
+#xf86-input-mouse
 
 ##permissions
 #gksu
@@ -30,6 +31,9 @@
 
 ##theme
 #numix-themes
+
+##Mouse themes
+xcursor-themes
 
 #fonts
 #ttf-dejavu
