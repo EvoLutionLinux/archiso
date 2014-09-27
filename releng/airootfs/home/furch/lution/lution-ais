@@ -43,8 +43,8 @@ VERSION="Lution-AIS 0.3"
   LTS=0                	# Has the LTS Kernel been installed?
   GRAPHIC_CARD=`hwinfo --gfxcard|grep 'Model:[[:space:]]'`  # Auto-detect popular graphics cards
   GC_DETECTED=""        # Name of Graphics Card Detected
+  NVIDIA_INST=0         # Indicates if NVIDIA proprietary driver has been installed
   SHOW_ONCE=0           # Show de_wm information only once
-  TUITION_MODE=0        # Extra information for beginners
   
 # Architecture
   ARCHI=`uname -m`     	# Display whether 32 or 64 bit system
@@ -817,18 +817,20 @@ install_alsa_xorg_input() {
 
 setup_graphics_card() {
 
-# basically this is used to manually set the GC_DETECTED variable
+# basically this is used to manually set the GC_DETECTED variable. Includes proprietary NVIDIA drivers.
 gc_driver_menu() {
 
    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Graphics Card Menu " \
-    --menu $"\nIf you are unsure - or your card is not listed - pick 'Unknown / Generic', which will install a generic, catch-all driver.\n" 17 50 7 \
+    --menu $"\nPick Nouveau for older NVIDIA cards. If your card is not listed, pick 'Unknown / Generic'.\n" 19 45 9 \
  	"1" $"AMD/ATI" \
 	"2" $"Intel" \
-	"3" $"NVIDIA" \
-	"4" $"Via" \
-	"5" $"VirtualBox" \
-    "6" $"VMWare" \
-	"7" $"Unknown / Generic" 2>${ANSWER}
+	"3" $"Nouveau (NVIDIA open-source)" \
+	"4" $"NVIDIA GeForce 8/9/100-400 +" \
+	"5" $"NVIDIA GeForce 6/7" \
+	"6" $"Via" \
+	"7" $"VirtualBox" \
+    "8" $"VMWare" \
+	"9" $"Unknown / Generic" 2>${ANSWER}
 
    case $(cat ${ANSWER}) in
         "1") GC_DETECTED="ATI"
@@ -837,13 +839,17 @@ gc_driver_menu() {
              ;;
         "3") GC_DETECTED="NVIDIA"
              ;;
-        "4") GC_DETECTED="Via"
+        "4") GC_DETECTED="NVIDIA-GF"
              ;;            
-        "5") GC_DETECTED="VirtualBox"
+        "5") GC_DETECTED="NVIDIA-304"
+             ;;              
+        "6") GC_DETECTED="Via"
+             ;;            
+        "7") GC_DETECTED="VirtualBox"
              ;;
-        "6") GC_DETECTED="VMware"
+        "8") GC_DETECTED="VMware"
              ;;
-        "7") GC_DETECTED="Generic"
+        "9") GC_DETECTED="Generic"
              ;;
           *) install_desktop_menu
              ;;
@@ -875,39 +881,59 @@ detect_graphics_card() {
 install_gc() {
 
  clear
- if   [[ $GC_DETECTED == "ATI" ]]; then
-      pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa
-      sed -i 's/^MODULES=(/MODULES=(radeon /' ${MOUNTPOINT}/etc/mkinitcpio.conf
- elif [[ $GC_DETECTED == "NVIDIA" ]]; then
-      pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa
-      sed -i 's/^MODULES=(/MODULES=(nouveau /' ${MOUNTPOINT}/etc/mkinitcpio.conf
- elif [[ $GC_DETECTED == "Intel" ]]; then
-      pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa
-      sed -i 's/^MODULES=(/MODULES=(i915 /' ${MOUNTPOINT}/etc/mkinitcpio.conf
- elif [[ $GC_DETECTED == "VirtualBox" ]]; then
  
-      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nIf for any reason the VirtualBox guest modules do not load for the installed system (e.g. low resolution and scrollbars after booting), a one-off series of commands will fix this:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
- 
-      if [[ $LTS -eq 1 ]]; then
-         clear
-         pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
-      else
-         clear
-         pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl    
-      fi
+ case $GC_DETECTED in
+        "ATI") pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa
+               sed -i 's/^MODULES=(/MODULES=(radeon /' ${MOUNTPOINT}/etc/mkinitcpio.conf
+               ;;
+     "NVIDIA") pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa
+               sed -i 's/^MODULES=(/MODULES=(nouveau /' ${MOUNTPOINT}/etc/mkinitcpio.conf
+               ;;
+  "NVIDIA-GF") [[ $LTS == 0 ]] && pactrap ${MOUNTPOINT} nvidia nvidia-libgl nvidia-utils pangox-compat \
+               || pactrap ${MOUNTPOINT} nvidia-lts nvidia-libgl nvidia-utils pangox-compat
+               NVIDIA_INST=1
+               ;;
+ "NVIDIA-304") [[ $LTS == 0 ]] && pactrap ${MOUNTPOINT} nvidia-304xx nvidia-304xx-libgl nvidia-304xx-utils \
+               || pactrap ${MOUNTPOINT}  nvidia-304xx-lts nvidia-304xx-libgl nvidia-304xx-utils
+               NVIDIA_INST=1
+               ;;
+      "Intel") pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa
+               sed -i 's/^MODULES=(/MODULES=(i915 /' ${MOUNTPOINT}/etc/mkinitcpio.conf
+               ;;
+ "VirtualBox") dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nIf for any reason the VirtualBox guest modules do not load for the installed system (e.g. low resolution and scrollbars after booting), a one-off series of commands will fix this:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
+               clear
+               [[ $LTS == 0 ]] && virtualbox-guest-utils virtualbox-guest-modules mesa-libgl \
+               || pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
       
-      # Load modules and enable vboxservice whatever the kernel type
-      arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"  
-      arch_chroot "systemctl enable vboxservice"
-      
- elif [[ $GC_DETECTED == "VMWare" ]]; then
-      pacstrap ${MOUNTPOINT} xf86-video-vmware xf86-input-vmmouse mesa-libgl mesa
- elif [[ $GC_DETECTED == "Via" ]]; then
-      pacstrap ${MOUNTPOINT} xf86-video-openchrome
- elif [[ $GC_DETECTED == "Generic" ]]; then 
-      pacstrap ${MOUNTPOINT} xf86-video-modesetting mesa-libgl mesa      
- else
-      gc_driver_menu  
+               # Load modules and enable vboxservice whatever the kernel
+               arch_chroot "modprobe -a vboxguest vboxsf vboxvideo"  
+               arch_chroot "systemctl enable vboxservice"
+               ;;
+     "VMWare") pacstrap ${MOUNTPOINT} xf86-video-vmware xf86-input-vmmouse mesa-libgl mesa
+               ;;
+        "Via") pacstrap ${MOUNTPOINT} xf86-video-openchrome
+               ;;
+    "Generic") pacstrap ${MOUNTPOINT} xf86-video-modesetting mesa-libgl mesa
+               ;;
+            *) gc_driver_menu  
+               ;;
+ esac
+
+ # Create a basic xorg configuration file for NVIDIA proprietary drivers where installed
+ if [[ $NVIDIA_INST == 1 ]]; then
+    echo "Section "\"Device"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        Identifier "\"Nvidia Card"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        Driver "\"nvidia"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        VendorName "\"NVIDIA Corporation"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        Option "\"NoLogo"\" "\"true"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        #Option "\"UseEDID"\" "\"false"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        #Option "\"ConnectedMonitor"\" "\"DFP"\"" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "        # ..." >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+    echo "EndSection" >> ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
+
+    # Allow user to check and amend the file
+    dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " NVIDIA Configuration Check " --msgbox "\nA basic NVIDIA configuration file has been created. Please check it before closing to continue.\n" 8 40
+    gksu leafpad ${MOUNTPOINT}/etc/X11/xorg.conf.d/20-nvidia.conf
  fi
 
 }
@@ -916,7 +942,7 @@ install_gc() {
     if [[ $GC_DETECTED == "Unknown" ]]; then
        gc_driver_menu
     else
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " $GC_DETECTED Detected " --yesno "\nIs your graphics card $GC_DETECTED?\n\n-Select 'Yes' to install its open-source driver.\n-Select 'No' to open the graphics card menu." 10 55 && install_gc || gc_driver_menu
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " $GC_DETECTED Detected " --yesno "\nIs your graphics card $GC_DETECTED?\n\n-Select 'Yes' to install its OPEN-SOURCE driver.\n\n-Select 'No' to open the graphics card menu, which includes proprietary NVIDIA drivers." 0 0 && install_gc || gc_driver_menu
     fi
 
 }
