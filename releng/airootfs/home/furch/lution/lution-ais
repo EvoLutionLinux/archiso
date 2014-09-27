@@ -889,12 +889,20 @@ install_gc() {
      "NVIDIA") pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa
                sed -i 's/^MODULES=(/MODULES=(nouveau /' ${MOUNTPOINT}/etc/mkinitcpio.conf
                ;;
-  "NVIDIA-GF") [[ $LTS == 0 ]] && pactrap ${MOUNTPOINT} nvidia nvidia-libgl nvidia-utils pangox-compat \
-               || pactrap ${MOUNTPOINT} nvidia-lts nvidia-libgl nvidia-utils pangox-compat
+  "NVIDIA-GF") #first remove mesa to avoid file conflicts
+               arch_chroot "pacman -Rdds --noconfirm mesa-libgl"
+  
+               # Now deal with kernel installed
+               [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} nvidia nvidia-libgl nvidia-utils pangox-compat \
+               || pacstrap ${MOUNTPOINT} nvidia-lts nvidia-libgl nvidia-utils pangox-compat
                NVIDIA_INST=1
                ;;
- "NVIDIA-304") [[ $LTS == 0 ]] && pactrap ${MOUNTPOINT} nvidia-304xx nvidia-304xx-libgl nvidia-304xx-utils \
-               || pactrap ${MOUNTPOINT}  nvidia-304xx-lts nvidia-304xx-libgl nvidia-304xx-utils
+ "NVIDIA-304") #first remove mesa to avoid file conflicts
+               arch_chroot "pacman -Rdds --noconfirm mesa-libgl"
+ 
+               # Now deal with kernel installed
+               [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} nvidia-304xx nvidia-304xx-libgl nvidia-304xx-utils \
+               || pacstrap ${MOUNTPOINT}  nvidia-304xx-lts nvidia-304xx-libgl nvidia-304xx-utils
                NVIDIA_INST=1
                ;;
       "Intel") pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa

@@ -8,7 +8,7 @@ xorg-xinit
 xorg-server-utils
 
 ##video drivers
-mesa 
+mesa
 xf86-video-modesetting
 
 ##networking
