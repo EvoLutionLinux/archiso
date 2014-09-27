@@ -628,8 +628,8 @@ mount_partitions() {
                 fi
                 MOUNT=$(cat ${ANSWER})
                 
-                # Ensure that no attempt is made to mount partitions without names
-                if [[ ${MOUNT:0} = "/" ]] && [[ ${MOUNT:1} != "/" ]]; then     
+                # Ensure that partitions to mount are properly named
+                if [[ ${MOUNT:0:1} == "/" ]] && [[ ${MOUNT:1:1} != "/" ]] && [[ ${MOUNT:1:1} != " " ]] && [[ ${#MOUNT} > 1 ]]; then     
                       mkdir -p ${MOUNTPOINT}${MOUNT}
                       mount $"/dev/"${PARTITION} ${MOUNTPOINT}${MOUNT}
                       confirm_mount ${MOUNTPOINT}${MOUNT}
