@@ -629,7 +629,7 @@ mount_partitions() {
                 MOUNT=$(cat ${ANSWER})
                 
                 # Ensure that no attempt is made to mount partitions without names
-                if [[ $MOUNT != "/" ]] && [[ $MOUNT != "//" ]] && [[ $MOUNT != "" ]]; then       
+                if [[ ${MOUNT:0} = "/" ]] && [[ ${MOUNT:1} != "/" ]]; then     
                       mkdir -p ${MOUNTPOINT}${MOUNT}
                       mount $"/dev/"${PARTITION} ${MOUNTPOINT}${MOUNT}
                       confirm_mount ${MOUNTPOINT}${MOUNT}
@@ -1055,7 +1055,7 @@ install_de_wm() {
     # Offer to install common packages
     if [[ $COMMON_INSTALLED -eq 0 ]]; then
        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Common Packges? " --yesno "\nSome environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality.\n\nPackages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc. Those installing the full KDE desktop alone will not need to install these.\n\nThis option will only be presented ONCE.\n" 16 60 \
-       && clear && pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg
+       && clear && pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg bash-completion
     fi
     
     # Either way, the option will no longer be presented.
