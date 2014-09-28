@@ -53,7 +53,6 @@ VERSION="Lution-AIS 0.3"
   ROOT_PART=""          # ROOT partition
   UEFI_PART=""			# UEFI partition
   UEFI_MOUNT=""         # UEFI mountpoint
-  BOOTLDR_ID=""         # Grub Bootloader ID for UEFI installations
   INST_DEV=""           # Device where system has been installed
   HIGHLIGHT=0           # Highlight items for Main Menu
   HIGHLIGHT_SUB=0	    # Highlight items for submenu
@@ -586,9 +585,9 @@ mount_partitions() {
        # Inform users of the mountpoint options and consequences
        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI Mountpoint Options " --msgbox $"\nThe bootloader(s) that can be installed later will depend on where the UEFI partition is mounted.\n\nSelect /boot for Gummiboot. This is recommended for beginners as the easiest option, especially where dual-booting.\n\nSelect /boot/efi for rEFInd. Although flashy, it is recommended for experienced users due to need to be manually updated.\n\nOtherwise, either mountpoint will work for Grub." 17 55
        
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\nGummiboot requires /boot, rEFInd requires /boot/efi, and Grub will work with either." 12 40 2 \
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Select UEFI Mountpoint " --menu $"\nGummiboot (recommended) requires /boot, rEFInd requires /boot/efi, and Grub will work with either." 12 40 2 \
  	   "1" $"/boot" \
-	   "2" $"/boot/efi" 2>${ANSWER}	
+	   "2" $"/boot/efi" 2>${ANSWER}
        
        case $(cat ${ANSWER}) in
         "1") UEFI_MOUNT="/boot"
@@ -648,15 +647,9 @@ mount_partitions() {
 ######################################################################	
 
 install_base() {
-
-    if [[ `echo ${GRAPHIC_CARD}|grep -i 'virtualbox[[:space:]]'` != "" ]]; then
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 0 0
-    else
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installation Note " --msgbox "\nWhere a wireless device has been detected, packages to support it will be installed automatically.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 0 0
-    fi
     
     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Base " \
-    --menu $"\nThe latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer.\n" 14 40 4 \
+    --menu $"\nThe latest kernel supports newer hardware. The LTS kernel is more stable, and is supported far longer.\n\nThe base-devel package group will be required to use the Arch User Repository (AUR)." 18 45 4 \
  	"1" $"Latest Kernel" \
 	"2" $"Latest Kernel & base-devel" \
 	"3" $"LTS Kernel" \
@@ -730,7 +723,7 @@ bios_bootloader() {
 }
 
 uefi_bootloader() {
-    # Need to add safeguard to check UEFI_MOUNT before proceeding for Gummiboot and rEFInd.
+
     #Ensure again that efivarfs is mounted
 	[[ -z $(mount | grep /sys/firmware/efi/efivars) ]] && mount -t efivarfs efivarfs /sys/firmware/efi/efivars
      
@@ -744,14 +737,15 @@ uefi_bootloader() {
      "1") # Grub2
           clear
           pacstrap ${MOUNTPOINT} grub os-prober efibootmgr dosfstools
-          
-          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set Grub as Default Bootloader? " --yesno $"\nSome UEFI firmware may not detect Grub unless it is set as the default bootloader, resulting in an unbootable system in such instances.\n\nDo you wish to set Grub as the default bootloader?\n\nIt is recommended to select 'Yes', especially for beginners. This will install the bootable grubx64.efi stub to ${UEFI_MOUNT}/EFI/boot and rename it to bootx64.efi, as required.\n\nOtherwise select 'No', particularly if there is already a default bootloader, and/or where intending to use multiple bootloaders." 18 65 \
-          && BOOTLDR_ID="boot" || BOOTLDR_ID="grub"
-          
-          clear
-          arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_MOUNT} --bootloader-id=${BOOTLDR_ID} --recheck"          
-          [[ $BOOTLDR_ID == "boot" ]] && arch_chroot "mv -f ${UEFI_MOUNT}/EFI/boot/grubx64.efi ${UEFI_MOUNT}/EFI/boot/bootx64.efi" 
+          arch_chroot "grub-install --target=x86_64-efi --efi-directory=${UEFI_MOUNT} --bootloader-id=arch_grub --recheck"
           arch_chroot "grub-mkconfig -o /boot/grub/grub.cfg"
+
+          # Ask if user wishes to set Grub as the default bootloader and act accordingly
+          dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set Grub as Default Bootloader? " --yesno $"\nSome UEFI firmware may not detect Grub unless it is set as the default bootloader, resulting in an unbootable system in such instances.\n\nDo you wish to set Grub as the default bootloader?\n\nIt is recommended to select 'Yes', especially for beginners. This will copy the bootable grubx64.efi stub to ${UEFI_MOUNT}/EFI/boot and rename it to bootx64.efi, as required.\n\nOtherwise select 'No', particularly if there is already a default bootloader, and/or where intending to use multiple bootloaders." 18 65 \
+          && arch_chroot "mkdir ${UEFI_MOUNT}/EFI/boot" \
+          && arch_chroot "cp -r ${UEFI_MOUNT}/EFI/arch_grub/grubx64.efi ${UEFI_MOUNT}/EFI/boot/bootx64.efi" \
+          && dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " UEFI File Copied " --infobox "\nGrub has been set as the default bootloader.\n" 6 30 \
+          && sleep 2
           ;;
           
      "2") # Gummiboot
@@ -890,7 +884,7 @@ install_gc() {
                sed -i 's/^MODULES=(/MODULES=(nouveau /' ${MOUNTPOINT}/etc/mkinitcpio.conf
                ;;
   "NVIDIA-GF") #first remove mesa to avoid file conflicts
-               arch_chroot "pacman -Rdds --noconfirm mesa-libgl"
+               arch_chroot "pacman -Rdds --noconfirm mesa-libgl mesa"
   
                # Now deal with kernel installed
                [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} nvidia nvidia-libgl nvidia-utils pangox-compat \
@@ -898,7 +892,7 @@ install_gc() {
                NVIDIA_INST=1
                ;;
  "NVIDIA-304") #first remove mesa to avoid file conflicts
-               arch_chroot "pacman -Rdds --noconfirm mesa-libgl"
+               arch_chroot "pacman -Rdds --noconfirm mesa-libgl mesa"
  
                # Now deal with kernel installed
                [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} nvidia-304xx nvidia-304xx-libgl nvidia-304xx-utils \
@@ -1088,7 +1082,7 @@ install_de_wm() {
     
     # Offer to install common packages
     if [[ $COMMON_INSTALLED -eq 0 ]]; then
-       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Common Packges? " --yesno "\nSome environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality.\n\nPackages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc. Those installing the full KDE desktop alone will not need to install these.\n\nThis option will only be presented ONCE.\n" 16 60 \
+       dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Install Common Packages? " --yesno "\nSome environments require common files to be installed, particularly for permissions, creation of home folders, and file manager functionality.\n\nPackages include: xterm, xdg-user-dirs, gksu, gnome-keyring, polkit, gvfs, and the gnome-icon-theme, etc. Those installing the full KDE desktop alone will not need to install these.\n\nInstall these packages? This option will only be presented ONCE.\n" 16 60 \
        && clear && pacstrap ${MOUNTPOINT} xterm gksu gnome-keyring polkit xdg-user-dirs xdg-utils gamin gvfs gvfs-afc gvfs-smb ttf-dejavu gnome-icon-theme python2-xdg bash-completion
     fi
     
