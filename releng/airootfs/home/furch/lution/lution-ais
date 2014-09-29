@@ -155,11 +155,11 @@ mirror_by_country() {
  sed -i 's/^#Server/Server/g' ${MIRROR_TEMP}
  leafpad ${MIRROR_TEMP}
 
- dialog --yesno $"Use generated mirrorlist for installer?" 0 0 \
+ dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --yesno $"Use generated mirrorlist for installer?" 0 0 \
  && mv -i -f /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.orig \
  && mv -i -f ${MIRROR_TEMP} /etc/pacman.d/mirrorlist \
  && chmod +r /etc/pacman.d/mirrorlist \
- && dialog --msgbox "\nDone! Original Mirrorlist has been saved as:\n\n/etc/pacman.d/mirrorlist.orig" 10 40 || prep_menu
+ && dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --msgbox "\nDone! Original Mirrorlist has been saved as:\n\n/etc/pacman.d/mirrorlist.orig" 10 40 || prep_menu
 }
 
 dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Mirrorlist " \
@@ -904,7 +904,7 @@ install_gc() {
                ;;
  "VirtualBox") dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nIf for any reason the VirtualBox guest modules do not load for the installed system (e.g. low resolution and scrollbars after booting), a one-off series of commands will fix this:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
                clear
-               [[ $LTS == 0 ]] && virtualbox-guest-utils virtualbox-guest-modules mesa-libgl \
+               [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules mesa-libgl \
                || pacstrap ${MOUNTPOINT} virtualbox-guest-utils virtualbox-guest-modules-lts mesa-libgl
       
                # Load modules and enable vboxservice whatever the kernel
