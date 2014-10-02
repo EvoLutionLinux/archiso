@@ -438,19 +438,22 @@ select_grub_device() {
 
 # Adapted from AIS. Integrated Gparted, and dropped most of the other partitioning tools.
 create_partitions(){
-# add more paritioning tools
+
     dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Partitioning Tool " \
-    --menu $"\nGParted is a recommended user-friendly graphical tool that supports both BIOS and UEFI systems." 13 55 3 \
+    --menu $"\nGParted is a recommended user-friendly graphical tool that supports both BIOS and UEFI systems.\n\nDO NOT select a UEFI/GPT-only partitioning tool for a BIOS/MBR system as this could cause serious problems, including an unbootable installation." 17 55 4 \
  	"1" $"GParted (GUI - BIOS & UEFI)" \
-	"2" $"CFDisk  (CLI - BIOS)" \
-	"3" $"GDisk   (CLI - UEFI/GPT)" 2>${ANSWER}	
+	"2" $"CFDisk  (CLI - BIOS/MBR)" \
+	"3" $"CGDisk  (CLI - UEFI/GPT)" \
+	"4" $"GDisk   (CLI - UEFI/GPT)" 2>${ANSWER}	
 
     case $(cat ${ANSWER}) in
         "1") gksu gparted ${DEVICE} >/dev/null 2>&1
              ;;
         "2") cfdisk ${DEVICE}
              ;;
-        "3") gdisk ${DEVICE}
+        "3") cgdisk ${DEVICE}
+             ;;       
+        "4") gdisk ${DEVICE}
              ;;
           *) prep_menu
              ;;
