@@ -1,6 +1,6 @@
 # !/bin/bash
 #
-# Lution-AIS installer (version 0.3 - September 2014)
+# Lution-AIS installer (version 0.3 - October 2014)
 #
 # Written by Carl Duff for Evo/Lution Linux
 #
@@ -332,17 +332,17 @@ set_root_password() {
 # Adapted and simplified from the Antergos 2.0 installer
 create_new_user() {
 
-        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Create New User " --inputbox "\nEnter the user name.\n\nIt is recommended to use all lower-case letters.\n" 11 55 "" 2>${ANSWER} || config_user_menu
+        dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Create New User " --inputbox "\nEnter the user name. Letters MUST be lower case.\n" 9 55 "" 2>${ANSWER} || config_user_menu
         USER=$(cat ${ANSWER})
         
-        if [[ $USER == "" ]]; then
-           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " User Name Error " --msgbox $"\nNo user name was entered. Please try again.\n" 8 35
+        if [[ ${#USER} < 1 ]] || [[ ${USER:0:1} == " " ]]; then
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " User Name Error " --msgbox $"\nAn incorrect user name was entered. Please try again.\n" 8 35
            create_new_user
         else
-           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set User Password " --clear --insecure --passwordbox "\nEnter password for $USER\n\n" 9 55 2> ${ANSWER} || config_user_menu
            PASSWD=$(cat ${ANSWER}) 
     
-           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 10 55 2> ${ANSWER} || config_user_menu
+           dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Set User Password " --clear --insecure --passwordbox "\nRe-enter password for $USER\n\n" 9 55 2> ${ANSWER} || config_user_menu
            PASSWD2=$(cat ${ANSWER}) 
     
            if [[ $PASSWD == $PASSWD2 ]]; then         
