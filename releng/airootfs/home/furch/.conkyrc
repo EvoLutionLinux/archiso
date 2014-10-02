@@ -1,6 +1,6 @@
     ## Evo/Lution Conky Configuration Script
     ##
-    ## Forum: http://evolution.boardhost.com/index.php
+    ## Forum: http://www.evolutionlinux.com/forums/index.php
     ##
      
     #  Basic Settings
@@ -54,7 +54,10 @@
     ${alignr}${color #BEBEBE}Lution-AIS Installer${voffset -5} 
  
     ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + g 
-    ${alignr}${color #BEBEBE}Evo/Lution Forums${voffset -5} 
+    ${alignr}${color #BEBEBE}On-line Installation Guide${voffset -5} 
+
+    ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + h 
+    ${alignr}${color #BEBEBE}Hardware Information${voffset -5} 
      
     ${font sans:bold:size=9}${alignr}${color #1793D1}Alt + t 
     ${alignr}${color #BEBEBE}Terminal${voffset -5} 

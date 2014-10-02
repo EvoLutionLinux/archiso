@@ -328,6 +328,11 @@
         <command>netsurf http://www.evolutionlinux.com/forums/index.php</command>
       </action>
     </keybind>
+        <keybind key="A-h">
+      <action name="Execute">
+        <command>hardinfo</command>
+      </action>
+    </keybind>
     <keybind key="A-x">
       <action name="Execute">
         <command>oblogout</command>
