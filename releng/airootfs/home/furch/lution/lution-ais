@@ -880,10 +880,10 @@ install_gc() {
  clear
  
  case $GC_DETECTED in
-        "ATI") pacstrap ${MOUNTPOINT} xf86-video-ati ati-dri mesa-libgl mesa
+        "ATI") pacstrap ${MOUNTPOINT} xf86-video-ati mesa-libgl mesa
                sed -i 's/^MODULES=(/MODULES=(radeon /' ${MOUNTPOINT}/etc/mkinitcpio.conf
                ;;
-     "NVIDIA") pacstrap ${MOUNTPOINT} xf86-video-nouveau nouveau-dri mesa-libgl mesa
+     "NVIDIA") pacstrap ${MOUNTPOINT} xf86-video-nouveau mesa-libgl mesa
                sed -i 's/^MODULES=(/MODULES=(nouveau /' ${MOUNTPOINT}/etc/mkinitcpio.conf
                ;;
   "NVIDIA-GF") #first remove mesa to avoid file conflicts
@@ -902,7 +902,7 @@ install_gc() {
                || pacstrap ${MOUNTPOINT}  nvidia-304xx-lts nvidia-304xx-libgl nvidia-304xx-utils
                NVIDIA_INST=1
                ;;
-      "Intel") pacstrap ${MOUNTPOINT} xf86-video-intel intel-dri libva-intel-driver mesa-libgl mesa
+      "Intel") pacstrap ${MOUNTPOINT} xf86-video-intel libva-intel-driver mesa-libgl mesa
                sed -i 's/^MODULES=(/MODULES=(i915 /' ${MOUNTPOINT}/etc/mkinitcpio.conf
                ;;
  "VirtualBox") dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " VirtualBox Installation " --msgbox "\nIf for any reason the VirtualBox guest modules do not load for the installed system (e.g. low resolution and scrollbars after booting), a one-off series of commands will fix this:\n\n$ su\n# depmod -a\n# modprobe -a vboxvideo vboxguest vboxsf\n# reboot" 0 0
