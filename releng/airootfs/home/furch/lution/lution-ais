@@ -901,8 +901,8 @@ install_gc() {
                arch_chroot "pacman -Rdds --noconfirm mesa-libgl mesa"
   
                # Now deal with kernel installed
-               [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} nvidia-340xx nvidia-304xx-libgl nvidia-304xx-utils \
-               || pacstrap ${MOUNTPOINT} nvidia-340xx-lts nvidia-304xx-libgl nvidia-304xx-utils
+               [[ $LTS == 0 ]] && pacstrap ${MOUNTPOINT} nvidia-340xx nvidia-340xx-libgl nvidia-340xx-utils \
+               || pacstrap ${MOUNTPOINT} nvidia-340xx-lts nvidia-340xx-libgl nvidia-340xx-utils
                NVIDIA_INST=1
                ;;
  "NVIDIA-304") #first remove mesa to avoid file conflicts
