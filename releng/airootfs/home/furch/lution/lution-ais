@@ -1076,7 +1076,7 @@ install_de_wm() {
              ;; 
         "15") #i3
               clear
-              pacstrap ${MOUNTPOINT} i3-wm i3lock i3status lxpolkit
+              pacstrap ${MOUNTPOINT} i3-wm i3lock i3status dmenu lxpolkit
              ;; 
         "16") #IceWM
               clear
