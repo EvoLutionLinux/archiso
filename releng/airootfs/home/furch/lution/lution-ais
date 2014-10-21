@@ -1000,7 +1000,7 @@ install_de_wm() {
              ;;
         "2") # Enlightement
              clear
-             pacstrap ${MOUNTPOINT} enlightenment terminology lxpolkit
+             pacstrap ${MOUNTPOINT} enlightenment terminology polkit-gnome
              ;;
         "3") # Gnome-Shell
              clear
@@ -1060,35 +1060,35 @@ install_de_wm() {
              ;;                 
         "11") # Xfce
               clear
-              pacstrap ${MOUNTPOINT} xfce4 lxpolkit
+              pacstrap ${MOUNTPOINT} xfce4 polkit-gnome
              ;;            
         "12") # Xfce + Extras
               clear
-              pacstrap ${MOUNTPOINT} xfce4 xfce4-goodies lxpolkit
+              pacstrap ${MOUNTPOINT} xfce4 xfce4-goodies polkit-gnome
              ;;
         "13") # Awesome
               clear
-              pacstrap ${MOUNTPOINT} awesome vicious lxpolkit
+              pacstrap ${MOUNTPOINT} awesome vicious polkit-gnome
              ;;
         "14") #Fluxbox
               clear 
-              pacstrap ${MOUNTPOINT} fluxbox fbnews fluxter lxpolkit
+              pacstrap ${MOUNTPOINT} fluxbox fbnews fluxter polkit-gnome
              ;; 
         "15") #i3
               clear
-              pacstrap ${MOUNTPOINT} i3-wm i3lock i3status dmenu lxpolkit
+              pacstrap ${MOUNTPOINT} i3-wm i3lock i3status dmenu polkit-gnome
              ;; 
         "16") #IceWM
               clear
-              pacstrap ${MOUNTPOINT} icewm icewm-themes lxpolkit
+              pacstrap ${MOUNTPOINT} icewm icewm-themes polkit-gnome
              ;; 
         "17") #Openbox
               clear
-              pacstrap ${MOUNTPOINT} openbox openbox-themes lxpolkit
+              pacstrap ${MOUNTPOINT} openbox openbox-themes polkit-gnome
              ;; 
         "18") #PekWM
               clear
-              pacstrap ${MOUNTPOINT} pekwm pekwm-themes lxpolkit 
+              pacstrap ${MOUNTPOINT} pekwm pekwm-themes polkit-gnome
              ;;            
           *) install_desktop_menu
              ;;

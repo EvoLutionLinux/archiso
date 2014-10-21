@@ -30,7 +30,7 @@ xf86-input-mouse
 ##permissions
 gksu
 polkit
-lxpolkit
+polkit-gnome
 gnome-keyring
 
 ##theme

@@ -8,7 +8,7 @@
 <action name="Execute"><command>lxterminal -e sudo ~/lution/lution-ais</command></action>
   </item>
   <item label="On-line Guide">
-<action name="Execute"><command>netsurf http://www.evolutionlinux.com/forums/index.php</command></action>
+<action name="Execute"><command>netsurf http://www.evolutionlinux.com/forums/viewforum.php?f=11</command></action>
   </item>
   <item label="Hardware Information">
 <action name="Execute"><command>hardinfo</command></action>

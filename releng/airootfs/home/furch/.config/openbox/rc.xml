@@ -325,7 +325,7 @@
     </keybind>
         <keybind key="A-g">
       <action name="Execute">
-        <command>netsurf http://www.evolutionlinux.com/forums/index.php</command>
+        <command>netsurf http://www.evolutionlinux.com/forums/viewforum.php?f=11</command>
       </action>
     </keybind>
         <keybind key="A-h">
