@@ -1,0 +1,49 @@
+# !/bin/bash
+#
+# Lution-AIS initialisation script (version 1 - November 2014)
+#
+# Written by Carl Duff for Evo/Lution Linux
+#
+# This script will automatically download the latest version of the installer
+# from github before executing it.
+#
+# This program is free software, provided under the GNU General Public License
+# as published by the Free Software Foundation. So feel free to copy, distribute,
+# or modify it as you wish.
+#
+
+VERSION="Lution-AIS Initialisation Script version 1.0"
+
+
+######################################################################
+##																	##
+##                        Core Functions							##
+##																	##
+######################################################################
+
+
+# Check user is root, and that there is an active internet connection
+# Seperated the checks into seperate "if" statements for readability.
+	
+  dialog --backtitle "$VERSION" --title " Checking Evo Requirements " --infobox "\nChecking installer has been run as root and that there is an active internet connection. Please wait...\n\n" 0 0
+  sleep 2
+  
+  if [[ `whoami` != "root" ]]; then
+     dialog --backtitle "$VERSION" --title " Root Failure " --infobox "\nThe installer must be run as root. Exiting.\n\n" 0 0
+     sleep 2
+     exit 1
+  fi
+  
+  if [[ ! ` ping -c 1 google.com ` ]]; then
+     dialog --backtitle "$VERSION" --title " Connection Failure " --infobox "\nInternet connection test failed. Exiting.\n\n" 0 0
+     sleep 2
+     exit 1
+  else
+     dialog --backtitle "$VERSION" --title " Requirements Met " --infobox "\nAll checks passed. Downloading latest version of Lution-AIS...\n\n" 0 0
+     sleep 2
+     clear
+     wget -N https://github.com/EvoLutionLinux/lution-ais/archive/master.zip
+   
+     unzip -o master.zip -d / 
+    /lution-ais-master/lution-ais
+  fi

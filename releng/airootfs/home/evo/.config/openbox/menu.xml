@@ -3,9 +3,9 @@
 <openbox_menu xmlns="http://openbox.org/3.4/menu">
 
 <menu id="root-menu" label="Openbox 3">
-  <separator label="Evo/Lution-AIS v0.3" />
+  <separator label="Evo/Lution-AIS" />
 <item label="Lution-AIS Installer">
-<action name="Execute"><command>lxterminal -e sudo ~/lution/lution-ais</command></action>
+<action name="Execute"><command>lxterminal -e sudo /initialise</command></action>
   </item>
   <item label="On-line Guide">
 <action name="Execute"><command>netsurf http://www.evolutionlinux.com/forums/viewforum.php?f=11</command></action>

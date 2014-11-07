@@ -320,7 +320,7 @@
     </keybind>
     <keybind key="A-i">
       <action name="Execute">
-        <command>lxterminal -e sudo ~/lution/lution-ais</command>
+        <command>lxterminal -e sudo /initialise</command>
       </action>
     </keybind>
         <keybind key="A-g">
