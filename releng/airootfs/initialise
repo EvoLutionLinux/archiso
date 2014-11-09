@@ -33,29 +33,29 @@ ANSWER="/tmp/.lution"
      sleep 2
      exit 1
      
-  else
-  
-      dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installer Version " \
-      --menu $"\nAll checks passed!\n\nDownload Stable or Development version of the installer?\n\nThe Development version may have more features, but is intended for beta testing, and may be unstable." 17 50 2 \
- 	  "1" $"Stable" \
-	  "2" $"Development" 2>${ANSWER}
-  
-      case $(cat ${ANSWER}) in
-          "1") # Stable Version
-               clear
-               wget -N https://github.com/EvoLutionLinux/lution-ais/archive/master.zip
-               ;;
-          "2") # Development Version
-               clear
-               wget -N https://github.com/CarlDuff/lution-ais/archive/master.zip
-               ;;
-            *) dialog --backtitle "$VERSION" --title " Cancel " --infobox "\nClosing Installer.\n\n" 0 0
-               sleep 2
-               exit 0
-               ;;
-      esac  	
-  
-      # Whatever the choice, same process to unzip and run.
-      unzip -o master.zip -d / 
-      /lution-ais-master/lution-ais
   fi
+  
+  # Provided both tests above passed, then this menu will be available.
+  dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installer Version " \
+  --menu $"\nAll checks passed!\n\nDownload Stable or Development version of the installer?\n\nThe Development version may have more features, but is intended for beta testing, and may be unstable." 17 50 2 \
+  "1" $"Stable" \
+  "2" $"Development" 2>${ANSWER}
+  
+  case $(cat ${ANSWER}) in
+       "1") # Stable Version
+            clear
+            wget -N https://github.com/EvoLutionLinux/lution-ais/archive/master.zip
+            ;;
+       "2") # Development Version
+            clear
+            wget -N https://github.com/CarlDuff/lution-ais/archive/master.zip
+            ;;
+         *) dialog --backtitle "$VERSION" --title " Cancel " --infobox "\nClosing Installer.\n\n" 0 0
+            sleep 2
+            exit 0
+            ;;
+  esac  	
+  
+  # Whatever the choice, same process to unzip and run.
+  unzip -o master.zip -d / 
+  /lution-ais-master/lution-ais
