@@ -36,7 +36,7 @@ ANSWER="/tmp/.lution"
   fi
   
   # Provided both tests above passed, then this menu will be available.
-  dialog --backtitle "$VERSION - $SYSTEM ($ARCHI)" --title " Installer Version " \
+  dialog --backtitle "$VERSION" --title " Installer Version " \
   --menu $"\nAll checks passed!\n\nDownload Stable or Development version of the installer?\n\nThe Development version may have more features, but is intended for beta testing, and may be unstable." 17 50 2 \
   "1" $"Stable" \
   "2" $"Development" 2>${ANSWER}
