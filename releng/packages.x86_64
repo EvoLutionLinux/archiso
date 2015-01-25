@@ -11,6 +11,7 @@ xorg-server-utils
 ##video drivers
 mesa
 xf86-video-modesetting
+xf86-video-nouveau
 
 ##networking
 networkmanager

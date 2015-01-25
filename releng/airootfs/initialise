@@ -1,10 +1,10 @@
 # !/bin/bash
 #
-# Lution-AIS initialisation script (version 1 - November 2014)
+# Lution-AIS initialisation script (version 1.1 - December 2014)
 #
 # Written by Carl Duff for Evo/Lution Linux
 #
-# This script will automatically download the latest version of the installer
+# This script will automatically download the latest versions of the installer
 # from github before executing it.
 #
 # This program is free software, provided under the GNU General Public License
@@ -12,32 +12,29 @@
 # or modify it as you wish.
 #
 
-VERSION="Lution-AIS Initialisation Script"
+VERSION="Lution-AIS Initialisation Script 1.1"
 ANSWER="/tmp/.lution"
 
 # Check user is root, and that there is an active internet connection
 # Seperated the checks into seperate "if" statements for readability.
 # User then has option of the Stable or Development version of the installer.
 	
-  dialog --backtitle "$VERSION" --title " Checking Evo Requirements " --infobox "\nChecking installer has been run as root and that there is an active internet connection. Please wait...\n\n" 0 0
+  dialog --backtitle "$VERSION" --title " Evo/Lution " --infobox "\nPlease wait... Even geduld aub... Bitte warten... Παρακαλώ περιμένετε... Attendere prego... Vennligst Vent... Proszę czekać... Подождите, пожалуйста... Por favor espera...\n" 0 0
   sleep 2
   
-  if [[ `whoami` != "root" ]]; then
-     dialog --backtitle "$VERSION" --title " Root Failure " --infobox "\nThe installer must be run as root. Exiting.\n\n" 0 0
-     sleep 2
+  if [[ $(whoami) != "root" ]]; then
+     dialog --backtitle "$VERSION" --title " Error " --msgbox "\n- The installer must be run as root.\n- Je moet aangemeld zijn als ROOT.\n- Der Installer muss mit Superuser-Rechten gestartet werden.\n- Τον εγκαταστάτη πρέπει να εκτελούνται ως root.\n- L'installer deve essere eseguito come Root.\n- Installereren må kjøres som root.\n- Instalator musi być uruchomiony z konta administratora (root).\n- Установщик должен выполняться только администратором системы (пользователем root).\n- El instalador debe ejecutarse como root.\n" 0 0
      exit 1
   fi
   
-  if [[ ! ` ping -c 1 google.com ` ]]; then
-     dialog --backtitle "$VERSION" --title " Connection Failure " --infobox "\nInternet connection test failed. Exiting.\n\n" 0 0
-     sleep 2
+  if [[ ! $(ping -c 1 google.com) ]]; then
+     dialog --backtitle "$VERSION" --title " Error " --msgbox "\n- Internet connection test failed.\n- Test internetverbinding mislukt.\n- Es konnte keine Verbindung zum Internet hergestellt werden.\n- οκιμή σύνδεσης στο Internet απέτυχε.\n- Il test della connessione ad Internet è fallito.\n- Internett tilkobling feilet.\n- Test połączenia z Internetem nie powiódł się.\n- Нет соединения с Интернетом.\n- Prueba de conexión a Internet fallida.\n" 0 0
      exit 1
-     
   fi
   
   # Provided both tests above passed, then this menu will be available.
   dialog --backtitle "$VERSION" --title " Installer Version " \
-  --menu $"\nAll checks passed!\n\nDownload Stable or Development version of the installer?\n\nThe Development version may have more features, but is intended for beta testing, and may be unstable." 17 50 2 \
+  --menu $"\nPlease choose / Gelieve te kiezen / Bitte wählen / Παρακαλώ επιλέξτε / Scegli / Vennligst velg / Proszę wybrać / Пожалуйста, выберите / Por favor elija\n\n1. Stable / stabiel / stabil / σταθερός / stabile / stabilny / стабильный / estable\n\n2. Development / ontwikkeling / Entwicklung / ανάπτυξη / sviluppo / utvikling / rozwój / развитие / desarrollo\n" 20 50 2 \
   "1" $"Stable" \
   "2" $"Development" 2>${ANSWER}
   
@@ -50,9 +47,7 @@ ANSWER="/tmp/.lution"
             clear
             wget -N https://github.com/CarlDuff/lution-ais/archive/master.zip
             ;;
-         *) dialog --backtitle "$VERSION" --title " Cancel " --infobox "\nClosing Installer.\n\n" 0 0
-            sleep 2
-            exit 0
+         *) exit 0
             ;;
   esac  	
   
